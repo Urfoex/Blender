@@ -2065,7 +2065,7 @@ static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 	PyObject *pyconvert;
 	
 	if (self == NULL) {
-		PyErr_SetString(PyExc_SystemError, "val = scene[key]: KX_Scene, "BGE_PROXY_ERROR_MSG);
+		PyErr_SetString(PyExc_SystemError, "val = scene[key]: KX_Scene, " BGE_PROXY_ERROR_MSG);
 		return NULL;
 	}
 
@@ -2095,7 +2095,7 @@ static int Map_SetItem(PyObject *self_v, PyObject *key, PyObject *val)
 		PyErr_Clear();
 	
 	if (self == NULL) {
-		PyErr_SetString(PyExc_SystemError, "scene[key] = value: KX_Scene, "BGE_PROXY_ERROR_MSG);
+		PyErr_SetString(PyExc_SystemError, "scene[key] = value: KX_Scene, " BGE_PROXY_ERROR_MSG);
 		return -1;
 	}
 
@@ -2142,7 +2142,7 @@ static int Seq_Contains(PyObject *self_v, PyObject *value)
 	KX_Scene* self = static_cast<KX_Scene*>BGE_PROXY_REF(self_v);
 	
 	if (self == NULL) {
-		PyErr_SetString(PyExc_SystemError, "val in scene: KX_Scene, "BGE_PROXY_ERROR_MSG);
+		PyErr_SetString(PyExc_SystemError, "val in scene: KX_Scene, " BGE_PROXY_ERROR_MSG);
 		return -1;
 	}
 
