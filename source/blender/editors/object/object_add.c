@@ -2112,6 +2112,7 @@ static int add_named_exec(bContext *C, wmOperator *op)
 	}
 
 	basen->lay = basen->object->lay = scene->lay;
+	basen->object->restrictflag &= ~OB_RESTRICT_VIEW;
 
 	if (event) {
 		ARegion *ar = CTX_wm_region(C);
@@ -2121,6 +2122,7 @@ static int add_named_exec(bContext *C, wmOperator *op)
 		ED_view3d_cursor3d_position(C, basen->object->loc, mval);
 	}
 	
+	ED_base_object_select(basen, BA_SELECT);
 	ED_base_object_activate(C, basen);
 
 	copy_object_set_idnew(C, dupflag);

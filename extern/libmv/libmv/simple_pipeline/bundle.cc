@@ -33,6 +33,10 @@
 #include "libmv/simple_pipeline/reconstruction.h"
 #include "libmv/simple_pipeline/tracks.h"
 
+#ifdef _OPENMP
+#  include <omp.h>
+#endif
+
 namespace libmv {
 
 // The intrinsics need to get combined into a single parameter block; use these
@@ -208,6 +212,9 @@ void BundleIntrinsicsLogMessage(int bundle_intrinsics) {
   } else if (bundle_intrinsics == (BUNDLE_FOCAL_LENGTH |
                                    BUNDLE_RADIAL_K1)) {
     LG << "Bundling f, k1.";
+  } else if (bundle_intrinsics == (BUNDLE_RADIAL_K1 |
+                                   BUNDLE_RADIAL_K2)) {
+    LG << "Bundling k1, k2.";
   } else {
     LOG(FATAL) << "Unsupported bundle combination.";
   }
@@ -328,6 +335,11 @@ void EuclideanBundleCommonIntrinsics(const Tracks &tracks,
   options.linear_solver_type = ceres::ITERATIVE_SCHUR;
   options.use_inner_iterations = true;
   options.max_num_iterations = 100;
+
+#ifdef _OPENMP
+  options.num_threads = omp_get_max_threads();
+  options.num_linear_solver_threads = omp_get_max_threads();
+#endif
 
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
