@@ -16,7 +16,10 @@
 #include "MT_Tuple3.h"
 #include "MT_Tuple4.h"
 
-#define SHADER_ATTRIBMAX 1
+#include <memory>
+#include <array>
+
+const int SHADER_ATTRIBMAX = 1;
 
 /**
  * BL_Sampler
@@ -36,45 +39,34 @@ public:
 #endif
 };
 
+class BL_UniformBase{
+public:
+	virtual ~BL_UniformBase(){};
+
+	virtual int GetLocation() = 0;
+	virtual void Apply(class BL_Shader *shader) = 0;
+};
+
 /**
  * BL_Uniform
  *  uniform storage 
  */
-class BL_Uniform 
+template<typename data_t, unsigned int size>
+class BL_Uniform : public BL_UniformBase
 {
 private:
-	int			mLoc;		// Uniform location
-	void*		mData;		// Memory allocated for variable
-	bool		mDirty;		// Caching variable  
-	int			mType;		// Enum UniformTypes
-	bool		mTranspose; // Transpose matrices
-	const int	mDataLen;	// Length of our data
+	int							mLoc;		// Uniform location
+	std::array<data_t, size>	mData;		// Memory allocated for variable
+	bool						mDirty;		// Caching variable  
+	bool						mTranspose; // Transpose matrices
 public:
-	BL_Uniform(int data_size);
+	BL_Uniform();
 	~BL_Uniform();
 	
-
 	void Apply(class BL_Shader *shader);
-	void SetData(int location, int type, bool transpose=false);
-
-	enum UniformTypes {
-		UNI_NONE	=0,
-		UNI_INT,
-		UNI_FLOAT,
-		UNI_INT2,
-		UNI_FLOAT2,
-		UNI_INT3,
-		UNI_FLOAT3,
-		UNI_INT4,
-		UNI_FLOAT4,
-		UNI_MAT3,
-		UNI_MAT4,
-		UNI_MAX
-	};
-
+	void Apply();
+	void SetData(std::array<data_t, size>&& data, int location, bool transpose);
 	int GetLocation()	{ return mLoc; }
-	void* getData()		{ return mData; }
-	
 	
 #ifdef WITH_CXX_GUARDEDALLOC
 	MEM_CXX_CLASS_ALLOC_FUNCS("GE:BL_Uniform")
@@ -112,8 +104,8 @@ class BL_Shader : public PyObjectPlus
 {
 	Py_Header
 private:
-	typedef std::vector<BL_Uniform*>	BL_UniformVec;
-	typedef std::vector<BL_DefUniform*>	BL_UniformVecDef;
+	typedef std::vector<std::shared_ptr<BL_UniformBase>>	BL_UniformVec;
+	typedef std::vector<std::shared_ptr<BL_DefUniform>>	BL_UniformVecDef;
 
 	unsigned int	mShader;			// Shader object 
 	int				mPass;				// 1.. unused
@@ -121,20 +113,21 @@ private:
 	bool			mUse;				// ...
 //BL_Sampler		mSampler[MAXTEX];	// Number of samplers
 	int				mAttr;				// Tangent attribute
-	const char*		vertProg;			// Vertex program string
-	const char*		fragProg;			// Fragment program string
+	std::string		mVertProg;			// Vertex program string
+	std::string		mFragProg;			// Fragment program string
 	bool			mError;				// ...
 	bool			mDirty;				// 
 
 	// Compiles and links the shader
 	bool LinkProgram();
+	bool OnProgramError( unsigned int tmpVert = 0, unsigned int tmpFrag = 0, unsigned int tmpProg = 0 );
 
 	// Stored uniform variables
 	BL_UniformVec		mUniforms;
 	BL_UniformVecDef	mPreDef;
 
 	// search by location
-	BL_Uniform*		FindUniform(const int location);
+	std::shared_ptr<BL_UniformBase>	FindUniform(const int location);
 	// clears uniform data
 	void			ClearUniforms();
 
@@ -173,10 +166,10 @@ public:
 		CONSTANT_TIMER
 	};
 
-	const char* GetVertPtr();
-	const char* GetFragPtr();
-	void SetVertPtr( char *vert );
-	void SetFragPtr( char *frag );
+	string GetVertPtr();
+	string GetFragPtr();
+	void SetVertPtr( string vert );
+	void SetFragPtr( string frag );
 	
 	// ---
 	int getNumPass()	{return mPass;}
@@ -202,8 +195,8 @@ public:
 	//void InitializeSampler(int unit, BL_Texture* texture );
 
 
-	void SetUniformfv(int location,int type, float *param, int size,bool transpose=false);
-	void SetUniformiv(int location,int type, int *param, int size,bool transpose=false);
+	template<typename data_t, int size>
+	void SetUniformv( int location, std::array< data_t, size >&& param, bool transpose = false );
 
 	int GetAttribLocation(const char *name);
 	void BindAttribute(const char *attr, int loc);
@@ -222,7 +215,7 @@ public:
 
 	// Python interface
 #ifdef WITH_PYTHON
-	virtual PyObject *py_repr(void) { return PyUnicode_FromFormat("BL_Shader\n\tvertex shader:%s\n\n\tfragment shader%s\n\n", vertProg, fragProg); }
+	virtual PyObject *py_repr(void) { return PyUnicode_FromFormat("BL_Shader\n\tvertex shader:%s\n\n\tfragment shader%s\n\n", mVertProg.c_str(), mFragProg.c_str()); }
 
 	// -----------------------------------
 	KX_PYMETHOD_DOC(BL_Shader, setSource);
