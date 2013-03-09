@@ -27,6 +27,7 @@
 /* defines VIEW3D_OT_ruler modal operator */
 
 #include "DNA_scene_types.h"
+#include "DNA_gpencil_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -35,6 +36,7 @@
 
 #include "BKE_context.h"
 #include "BKE_unit.h"
+#include "BKE_gpencil.h"
 
 #include "BIF_gl.h"
 
@@ -51,6 +53,54 @@
 #include "UI_interface.h"
 
 #include "view3d_intern.h"  /* own include */
+
+
+/* -------------------------------------------------------------------- */
+/* Snapping (could be own function) */
+/* NOTE - this is not very nice use of transform snapping */
+#include "ED_transform.h"
+#include "../transform/transform.h"
+
+static bool ED_view3d_snap_co(bContext *C, float r_co[3], const float co_ss[2],
+                              bool use_vert, bool use_edge, bool use_face)
+{
+	TransInfo t = {0};
+	int dist = 12;  /* snap dist */
+	float r_no_dummy[3];
+	bool ret = false;
+	char  backup_snap_mode;
+	Base *backup_baseact;
+
+	t.scene  = CTX_data_scene(C);
+	t.view   = CTX_wm_view3d(C);
+	t.ar     = CTX_wm_region(C);
+	t.obedit = CTX_data_edit_object(C);
+
+	backup_snap_mode = t.scene->toolsettings->snap_mode;
+	backup_baseact = t.scene->basact;
+	t.scene->basact = NULL;
+
+	/* try snap edge, then face if it fails */
+	if (use_vert) {
+		t.scene->toolsettings->snap_mode = SCE_SNAP_MODE_VERTEX;
+		ret = snapObjectsTransform(&t, co_ss, &dist, r_co, r_no_dummy, SNAP_ALL);
+	}
+	if (use_edge && (ret == false)) {
+		t.scene->toolsettings->snap_mode = SCE_SNAP_MODE_EDGE;
+		ret = snapObjectsTransform(&t, co_ss, &dist, r_co, r_no_dummy, SNAP_ALL);
+	}
+	if (use_face && (ret == false)) {
+		t.scene->toolsettings->snap_mode = SCE_SNAP_MODE_FACE;
+		ret = snapObjectsTransform(&t, co_ss, &dist, r_co, r_no_dummy, SNAP_ALL);
+	}
+
+	t.scene->toolsettings->snap_mode = backup_snap_mode;
+	t.scene->basact = backup_baseact;
+
+	return ret;
+}
+/* done snapping */
+
 
 /* -------------------------------------------------------------------- */
 /* Ruler Item (we can have many) */
@@ -110,13 +160,11 @@ static RulerItem *ruler_item_add(RulerInfo *ruler_info)
 	return ruler_item;
 }
 
-#if 0
 static void ruler_item_remove(RulerInfo *ruler_info, RulerItem *ruler_item)
 {
 	BLI_remlink(&ruler_info->items, ruler_item);
 	MEM_freeN(ruler_item);
 }
-#endif
 
 static RulerItem *ruler_item_active_get(RulerInfo *ruler_info)
 {
@@ -198,6 +246,105 @@ static bool view3d_ruler_pick(RulerInfo *ruler_info, const float mval[2],
 		*r_co_index = -1;
 		return false;
 	}
+}
+
+#define RULER_ID "RulerData3D"
+static bool view3d_ruler_to_gpencil(bContext *C, RulerInfo *ruler_info)
+{
+	Scene *scene = CTX_data_scene(C);
+	bGPDlayer *gpl;
+	bGPDframe *gpf;
+	bGPDstroke *gps;
+	RulerItem *ruler_item;
+	const char *ruler_name = RULER_ID;
+	bool change = false;
+
+	if (scene->gpd == NULL) {
+		scene->gpd = gpencil_data_addnew("GPencil");
+	}
+
+	gpl = BLI_findstring(&scene->gpd->layers, ruler_name, offsetof(bGPDlayer, info));
+	if (gpl == NULL) {
+		gpl = gpencil_layer_addnew(scene->gpd, ruler_name, false);
+		gpl->thickness = 1;
+		gpl->flag |= GP_LAYER_HIDE;
+	}
+
+	gpf = gpencil_layer_getframe(gpl, CFRA, true);
+	free_gpencil_strokes(gpf);
+
+	for (ruler_item = ruler_info->items.first; ruler_item; ruler_item = ruler_item->next) {
+		bGPDspoint *pt;
+		int j;
+
+		/* allocate memory for a new stroke */
+		gps = MEM_callocN(sizeof(bGPDstroke), "gp_stroke");
+		if (ruler_item->flag & RULERITEM_USE_ANGLE) {
+			gps->totpoints = 3;
+			pt = gps->points = MEM_callocN(sizeof(bGPDspoint) * gps->totpoints, "gp_stroke_points");
+			for (j = 0; j < 3; j++) {
+				copy_v3_v3(&pt->x, ruler_item->co[j]);
+				pt->pressure = 1.0f;
+				pt++;
+			}
+		}
+		else {
+			gps->totpoints = 2;
+			pt = gps->points = MEM_callocN(sizeof(bGPDspoint) * gps->totpoints, "gp_stroke_points");
+			for (j = 0; j < 3; j += 2) {
+				copy_v3_v3(&pt->x, ruler_item->co[j]);
+				pt->pressure = 1.0f;
+				pt++;
+			}
+		}
+		gps->flag = GP_STROKE_3DSPACE;
+		BLI_addtail(&gpf->strokes, gps);
+		change = true;
+	}
+
+	return change;
+}
+
+static bool view3d_ruler_from_gpencil(bContext *C, RulerInfo *ruler_info)
+{
+	Scene *scene = CTX_data_scene(C);
+	bool change = false;
+
+	if (scene->gpd) {
+		bGPDlayer *gpl;
+		const char *ruler_name = RULER_ID;
+		gpl = BLI_findstring(&scene->gpd->layers, ruler_name, offsetof(bGPDlayer, info));
+		if (gpl) {
+			bGPDframe *gpf;
+			gpf = gpencil_layer_getframe(gpl, CFRA, false);
+			if (gpf) {
+				bGPDstroke *gps;
+				for (gps = gpf->strokes.first; gps; gps = gps->next) {
+					bGPDspoint *pt = gps->points;
+					int j;
+					if (gps->totpoints == 3) {
+						RulerItem *ruler_item = ruler_item_add(ruler_info);
+						for (j = 0; j < 3; j++) {
+							copy_v3_v3(ruler_item->co[j], &pt->x);
+							pt++;
+						}
+						ruler_item->flag |= RULERITEM_USE_ANGLE;
+						change = true;
+					}
+					else if (gps->totpoints == 2) {
+						RulerItem *ruler_item = ruler_item_add(ruler_info);
+						for (j = 0; j < 3; j++) {
+							copy_v3_v3(ruler_item->co[j], &pt->x);
+							pt++;
+						}
+						change = true;
+					}
+				}
+			}
+		}
+	}
+
+	return change;
 }
 
 /* -------------------------------------------------------------------- */
@@ -522,7 +669,12 @@ static bool view3d_ruler_item_mousemove(bContext *C, RulerInfo *ruler_info, cons
 	RulerItem *ruler_item = ruler_item_active_get(ruler_info);
 
 	if (ruler_item) {
-		view3d_ruler_item_project(C, ruler_info, ruler_item->co[ruler_item->co_index], event->mval);
+		float *co = ruler_item->co[ruler_item->co_index];
+		view3d_ruler_item_project(C, ruler_info, co, event->mval);
+		if (event->ctrl) {
+			const float mval_fl[2] = {UNPACK2(event->mval)};
+			ED_view3d_snap_co(C, co, mval_fl, true, true, true);
+		}
 		return true;
 	}
 	else {
@@ -541,6 +693,10 @@ static int view3d_ruler_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	(void)event;
 
 	ruler_info = MEM_callocN(sizeof(RulerInfo), "RulerInfo");
+
+	if (view3d_ruler_from_gpencil(C, ruler_info)) {
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	}
 
 	op->customdata = ruler_info;
 
@@ -591,7 +747,10 @@ static int view3d_ruler_modal(bContext *C, wmOperator *op, wmEvent *event)
 			else {
 				if (ruler_info->state == RULER_STATE_NORMAL) {
 
-					if (event->ctrl) {
+					if (event->ctrl ||
+					    /* weak - but user friendly */
+					    (ruler_info->items.first == NULL))
+					{
 						/* Create new line */
 						RulerItem *ruler_item;
 						/* check if we want to drag an existing point or add a new one */
@@ -658,6 +817,12 @@ static int view3d_ruler_modal(bContext *C, wmOperator *op, wmEvent *event)
 				}
 			}
 			break;
+		case RIGHTCTRLKEY:
+		case LEFTCTRLKEY:
+		{
+			WM_event_add_mousemove(C);
+			break;
+		}
 		case MOUSEMOVE:
 		{
 			if (ruler_info->state == RULER_STATE_DRAG) {
@@ -667,11 +832,31 @@ static int view3d_ruler_modal(bContext *C, wmOperator *op, wmEvent *event)
 			}
 			break;
 		}
-
 		case ESCKEY:
 		{
 			do_draw = true;
 			exit_code = OPERATOR_CANCELLED;
+			break;
+		}
+		case RETKEY:
+		{
+			view3d_ruler_to_gpencil(C, ruler_info);
+			do_draw = true;
+			exit_code = OPERATOR_FINISHED;
+			break;
+		}
+		case DELKEY:
+		{
+			if (event->val == KM_PRESS) {
+				if (ruler_info->state == RULER_STATE_NORMAL) {
+					RulerItem *ruler_item = ruler_item_active_get(ruler_info);
+					if (ruler_item) {
+						ruler_item_remove(ruler_info, ruler_item);
+						ruler_info->item_active = -1;
+						do_draw = true;
+					}
+				}
+			}
 			break;
 		}
 		default:
@@ -681,7 +866,10 @@ static int view3d_ruler_modal(bContext *C, wmOperator *op, wmEvent *event)
 	}
 
 	if (do_draw) {
-		ED_region_tag_redraw(ar);
+		// ED_region_tag_redraw(ar);
+
+		/* all 3d views draw rulers */
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 	}
 
 	if (ELEM(exit_code, OPERATOR_FINISHED, OPERATOR_CANCELLED)) {
@@ -696,7 +884,7 @@ static int view3d_ruler_modal(bContext *C, wmOperator *op, wmEvent *event)
 void VIEW3D_OT_ruler(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "3D Ruler";
+	ot->name = "3D Ruler & Protractor";
 	ot->description = "Interactive ruler";
 	ot->idname = "VIEW3D_OT_ruler";
 
@@ -707,5 +895,5 @@ void VIEW3D_OT_ruler(wmOperatorType *ot)
 	ot->poll = ED_operator_view3d_active;
 
 	/* flags */
-	ot->flag = OPTYPE_BLOCKING;
+	ot->flag = 0;
 }

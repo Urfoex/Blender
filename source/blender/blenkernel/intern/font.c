@@ -101,7 +101,7 @@ void BKE_vfont_free(struct VFont *vf)
 static void *builtin_font_data = NULL;
 static int builtin_font_size = 0;
 
-int  BKE_vfont_is_builtin(struct VFont *vfont)
+bool BKE_vfont_is_builtin(struct VFont *vfont)
 {
 	return (strcmp(vfont->name, FO_BUILTIN_NAME) == 0);
 }
@@ -943,10 +943,13 @@ makebreak:
 			ct = chartransdata;
 			for (i = 0; i < slen; i++) {
 				if (ct->linenr == lnr) {
-					if (ct->charnr == cnr) break;
-					if ( (ct + 1)->charnr == 0) break;
+					if ((ct->charnr == cnr) || ((ct + 1)->charnr == 0)) {
+						break;
+					}
 				}
-				else if (ct->linenr > lnr) break;
+				else if (ct->linenr > lnr) {
+					break;
+				}
 				cu->pos++;
 				ct++;
 			}
