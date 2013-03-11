@@ -678,7 +678,12 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
             self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             row = col.row(align=True)
-            row.prop(brush, "jitter", slider=True)
+            if(brush.use_relative_jitter):
+                row.prop(brush, "use_relative_jitter", text="", icon='LOCKED')
+                row.prop(brush, "jitter", slider=True)
+            else:
+                row.prop(brush, "use_relative_jitter", text="", icon='UNLOCKED')
+                row.prop(brush, "jitter_absolute")
             row.prop(brush, "use_pressure_jitter", toggle=True, text="")
 
             col.prop(brush, "blend", text="Blend")
@@ -706,7 +711,12 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
             self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             row = col.row(align=True)
-            row.prop(brush, "jitter", slider=True)
+            if(brush.use_relative_jitter):
+                row.prop(brush, "use_relative_jitter", text="", icon='LOCKED')
+                row.prop(brush, "jitter", slider=True)
+            else:
+                row.prop(brush, "use_relative_jitter", text="", icon='UNLOCKED')
+                row.prop(brush, "jitter_absolute")
             row.prop(brush, "use_pressure_jitter", toggle=True, text="")
 
             col.prop(brush, "vertex_tool", text="Blend")
@@ -808,9 +818,10 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
 
             if brush.use_space:
                 col.separator()
-                row = col.row()
+                row = col.row(align=True)
                 row.active = brush.use_space
                 row.prop(brush, "spacing", text="Spacing")
+                row.prop(brush, "use_pressure_spacing", toggle=True, text="")
 
             if brush.sculpt_capabilities.has_smooth_stroke:
                 col = layout.column()
@@ -827,7 +838,12 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
                 col.separator()
 
                 row = col.row(align=True)
-                row.prop(brush, "jitter", slider=True)
+                if(brush.use_relative_jitter):
+                    row.prop(brush, "use_relative_jitter", text="", icon='LOCKED')
+                    row.prop(brush, "jitter", slider=True)
+                else:
+                    row.prop(brush, "use_relative_jitter", text="", icon='UNLOCKED')
+                    row.prop(brush, "jitter_absolute")
                 row.prop(brush, "use_pressure_jitter", toggle=True, text="")
 
         else:
@@ -853,9 +869,10 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
             col.active = brush.sculpt_capabilities.has_spacing
             col.prop(brush, "use_space")
 
-            row = col.row()
+            row = col.row(align=True)
             row.active = brush.use_space
             row.prop(brush, "spacing", text="Spacing")
+            row.prop(brush, "use_pressure_spacing", toggle=True, text="")
 
 
 class VIEW3D_PT_tools_brush_curve(Panel, View3DPaintPanel):
@@ -1207,7 +1224,7 @@ class VIEW3D_MT_tools_projectpaint_stencil(Menu):
 
 
 class VIEW3D_PT_tools_particlemode(View3DPanel, Panel):
-    """default tools for particle mode"""
+    """Default tools for particle mode"""
     bl_context = "particlemode"
     bl_label = "Options"
 

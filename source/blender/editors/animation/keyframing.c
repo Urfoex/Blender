@@ -1307,7 +1307,7 @@ static int insert_key_menu_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(e
 		uiLayout *layout;
 		
 		/* call the menu, which will call this operator again, hence the canceled */
-		pup = uiPupMenuBegin(C, op->type->name, ICON_NONE);
+		pup = uiPupMenuBegin(C, RNA_struct_ui_name(op->type->srna), ICON_NONE);
 		layout = uiPupMenuLayout(pup);
 		uiItemsEnumO(layout, "ANIM_OT_keyframe_insert_menu", "type");
 		uiPupMenuEnd(C, pup);
@@ -1636,7 +1636,7 @@ static int insert_key_button_exec(bContext *C, wmOperator *op)
 		else {
 			BKE_reportf(op->reports, RPT_WARNING,
 			            "Button doesn't appear to have any property information attached (ptr.data = %p, prop = %p)",
-						(void *)ptr.data, (void *)prop);
+			            (void *)ptr.data, (void *)prop);
 		}
 	}
 	

@@ -86,6 +86,34 @@ BLI_INLINE unsigned char f_to_char(const float val)
 
 #define IMAPAINT_FLOAT_RGB_COPY(a, b) copy_v3_v3(a, b)
 
+typedef struct BrushPainterCache {
+	short enabled;
+
+	int size;           /* size override, if 0 uses 2*BKE_brush_size_get(brush) */
+	short flt;          /* need float imbuf? */
+	short texonly;      /* no alpha, color or fallof, only texture in imbuf */
+
+	int lastsize;
+	float lastalpha;
+	float lastjitter;
+
+	ImBuf *ibuf;
+	ImBuf *texibuf;
+	ImBuf *maskibuf;
+} BrushPainterCache;
+
+typedef struct BrushPainter {
+	Scene *scene;
+	Brush *brush;
+
+	float lastpaintpos[2];  /* position of last paint op */
+	float startpaintpos[2]; /* position of first paint */
+
+	short firsttouch;       /* first paint op */
+
+	BrushPainterCache cache;
+} BrushPainter;
+
 typedef struct ImagePaintRegion {
 	int destx, desty;
 	int srcx, srcy;
@@ -114,48 +142,8 @@ typedef struct ImagePaintState {
 	int do_facesel;
 } ImagePaintState;
 
-typedef struct BrushPainterCache {
-	short enabled;
 
-	int size;           /* size override, if 0 uses 2*BKE_brush_size_get(brush) */
-	short flt;          /* need float imbuf? */
-	short texonly;      /* no alpha, color or fallof, only texture in imbuf */
-
-	int lastsize;
-	float lastalpha;
-	float lastjitter;
-
-	ImBuf *ibuf;
-	ImBuf *texibuf;
-	ImBuf *maskibuf;
-} BrushPainterCache;
-
-struct BrushPainter {
-	Scene *scene;
-	Brush *brush;
-
-	float lastmousepos[2];  /* mouse position of last paint call */
-
-	float accumdistance;    /* accumulated distance of brush since last paint op */
-	float lastpaintpos[2];  /* position of last paint op */
-	float startpaintpos[2]; /* position of first paint */
-
-	double accumtime;       /* accumulated time since last paint op (airbrush) */
-	double lasttime;        /* time of last update */
-
-	float lastpressure;
-
-	short firsttouch;       /* first paint op */
-
-	float startsize;
-	float startalpha;
-	float startjitter;
-	float startspacing;
-
-	BrushPainterCache cache;
-};
-
-BrushPainter *brush_painter_2d_new(Scene *scene, Brush *brush)
+static BrushPainter *brush_painter_2d_new(Scene *scene, Brush *brush)
 {
 	BrushPainter *painter = MEM_callocN(sizeof(BrushPainter), "BrushPainter");
 
@@ -164,29 +152,11 @@ BrushPainter *brush_painter_2d_new(Scene *scene, Brush *brush)
 	painter->firsttouch = 1;
 	painter->cache.lastsize = -1; /* force ibuf create in refresh */
 
-	painter->startsize = BKE_brush_size_get(scene, brush);
-	painter->startalpha = BKE_brush_alpha_get(scene, brush);
-	painter->startjitter = brush->jitter;
-	painter->startspacing = brush->spacing;
-
 	return painter;
 }
 
 
-static void brush_pressure_apply(BrushPainter *painter, Brush *brush, float pressure)
-{
-	if (BKE_brush_use_alpha_pressure(painter->scene, brush))
-		BKE_brush_alpha_set(painter->scene, brush, max_ff(0.0f, painter->startalpha * pressure));
-	if (BKE_brush_use_size_pressure(painter->scene, brush))
-		BKE_brush_size_set(painter->scene, brush, max_ff(1.0f, painter->startsize * pressure));
-	if (brush->flag & BRUSH_JITTER_PRESSURE)
-		brush->jitter = max_ff(0.0f, painter->startjitter * pressure);
-	if (brush->flag & BRUSH_SPACING_PRESSURE)
-		brush->spacing = max_ff(1.0f, painter->startspacing * (1.5f - pressure));
-}
-
-
-void brush_painter_2d_require_imbuf(BrushPainter *painter, short flt, short texonly, int size)
+static void brush_painter_2d_require_imbuf(BrushPainter *painter, short flt, short texonly, int size)
 {
 	if ((painter->cache.flt != flt) || (painter->cache.size != size) ||
 	    ((painter->cache.texonly != texonly) && texonly))
@@ -209,15 +179,8 @@ void brush_painter_2d_require_imbuf(BrushPainter *painter, short flt, short texo
 	painter->cache.enabled = 1;
 }
 
-void brush_painter_2d_free(BrushPainter *painter)
+static void brush_painter_2d_free(BrushPainter *painter)
 {
-	Brush *brush = painter->brush;
-
-	BKE_brush_size_set(painter->scene, brush, painter->startsize);
-	BKE_brush_alpha_set(painter->scene, brush, painter->startalpha);
-	brush->jitter = painter->startjitter;
-	brush->spacing = painter->startspacing;
-
 	if (painter->cache.ibuf) IMB_freeImBuf(painter->cache.ibuf);
 	if (painter->cache.texibuf) IMB_freeImBuf(painter->cache.texibuf);
 	if (painter->cache.maskibuf) IMB_freeImBuf(painter->cache.maskibuf);
@@ -416,173 +379,6 @@ static void brush_painter_2d_refresh_cache(BrushPainter *painter, const float po
 			brush_painter_2d_tiled_tex_partial_update(painter, pos);
 	}
 }
-
-void brush_painter_2d_break_stroke(BrushPainter *painter)
-{
-	painter->firsttouch = 1;
-}
-
-
-int brush_painter_2d_paint(BrushPainter *painter, BrushFunc func, const float pos[2], double time, float pressure,
-                            void *user, int use_color_correction)
-{
-	Scene *scene = painter->scene;
-	Brush *brush = painter->brush;
-	int totpaintops = 0;
-
-	if (pressure == 0.0f) {
-		if (painter->lastpressure) // XXX - hack, operator misses
-			pressure = painter->lastpressure;
-		else
-			pressure = 1.0f;    /* zero pressure == not using tablet */
-	}
-	if (painter->firsttouch) {
-		/* paint exactly once on first touch */
-		painter->startpaintpos[0] = pos[0];
-		painter->startpaintpos[1] = pos[1];
-
-		brush_pressure_apply(painter, brush, pressure);
-		if (painter->cache.enabled)
-			brush_painter_2d_refresh_cache(painter, pos, use_color_correction);
-		totpaintops += func(user, painter->cache.ibuf, pos, pos);
-		
-		painter->lasttime = time;
-		painter->firsttouch = 0;
-		painter->lastpaintpos[0] = pos[0];
-		painter->lastpaintpos[1] = pos[1];
-	}
-#if 0
-	else if (painter->brush->flag & BRUSH_AIRBRUSH) {
-		float spacing, step, paintpos[2], dmousepos[2], len;
-		double starttime, curtime = time;
-
-		/* compute brush spacing adapted to brush size */
-		spacing = brush->rate; //radius*brush->spacing * 0.01f;
-
-		/* setup starting time, direction vector and accumulated time */
-		starttime = painter->accumtime;
-		sub_v2_v2v2(dmousepos, pos, painter->lastmousepos);
-		len = normalize_v2(dmousepos);
-		painter->accumtime += curtime - painter->lasttime;
-
-		/* do paint op over unpainted time distance */
-		while (painter->accumtime >= spacing) {
-			step = (spacing - starttime) * len;
-			paintpos[0] = painter->lastmousepos[0] + dmousepos[0] * step;
-			paintpos[1] = painter->lastmousepos[1] + dmousepos[1] * step;
-
-			if (painter->cache.enabled)
-				brush_painter_refresh_cache(painter);
-			totpaintops += func(user, painter->cache.ibuf,
-			                    painter->lastpaintpos, paintpos);
-
-			painter->lastpaintpos[0] = paintpos[0];
-			painter->lastpaintpos[1] = paintpos[1];
-			painter->accumtime -= spacing;
-			starttime -= spacing;
-		}
-		
-		painter->lasttime = curtime;
-	}
-#endif
-	else {
-		float startdistance, spacing, step, paintpos[2], dmousepos[2], finalpos[2];
-		float t, len, press;
-		const int radius = BKE_brush_size_get(scene, brush);
-
-		/* compute brush spacing adapted to brush radius, spacing may depend
-		 * on pressure, so update it */
-		brush_pressure_apply(painter, brush, painter->lastpressure);
-		spacing = max_ff(1.0f, radius) * brush->spacing * 0.01f;
-
-		/* setup starting distance, direction vector and accumulated distance */
-		startdistance = painter->accumdistance;
-		sub_v2_v2v2(dmousepos, pos, painter->lastmousepos);
-		len = normalize_v2(dmousepos);
-		painter->accumdistance += len;
-
-		if (brush->flag & BRUSH_SPACE) {
-			/* do paint op over unpainted distance */
-			while ((len > 0.0f) && (painter->accumdistance >= spacing)) {
-				step = spacing - startdistance;
-				paintpos[0] = painter->lastmousepos[0] + dmousepos[0] * step;
-				paintpos[1] = painter->lastmousepos[1] + dmousepos[1] * step;
-
-				t = step / len;
-				press = (1.0f - t) * painter->lastpressure + t * pressure;
-				brush_pressure_apply(painter, brush, press);
-				spacing = max_ff(1.0f, radius) * brush->spacing * 0.01f;
-
-				BKE_brush_jitter_pos(scene, brush, paintpos, finalpos);
-
-				if (painter->cache.enabled)
-					brush_painter_2d_refresh_cache(painter, finalpos, use_color_correction);
-
-				totpaintops +=
-				    func(user, painter->cache.ibuf, painter->lastpaintpos, finalpos);
-
-				painter->lastpaintpos[0] = paintpos[0];
-				painter->lastpaintpos[1] = paintpos[1];
-				painter->accumdistance -= spacing;
-				startdistance -= spacing;
-			}
-		}
-		else {
-			BKE_brush_jitter_pos(scene, brush, pos, finalpos);
-
-			if (painter->cache.enabled)
-				brush_painter_2d_refresh_cache(painter, finalpos, use_color_correction);
-
-			totpaintops += func(user, painter->cache.ibuf, pos, finalpos);
-
-			painter->lastpaintpos[0] = pos[0];
-			painter->lastpaintpos[1] = pos[1];
-			painter->accumdistance = 0;
-		}
-
-		/* do airbrush paint ops, based on the number of paint ops left over
-		 * from regular painting. this is a temporary solution until we have
-		 * accurate time stamps for mouse move events */
-		if (brush->flag & BRUSH_AIRBRUSH) {
-			double curtime = time;
-			double painttime = brush->rate * totpaintops;
-
-			painter->accumtime += curtime - painter->lasttime;
-			if (painter->accumtime <= painttime)
-				painter->accumtime = 0.0;
-			else
-				painter->accumtime -= painttime;
-
-			while (painter->accumtime >= (double)brush->rate) {
-				brush_pressure_apply(painter, brush, pressure);
-
-				BKE_brush_jitter_pos(scene, brush, pos, finalpos);
-
-				if (painter->cache.enabled)
-					brush_painter_2d_refresh_cache(painter, finalpos, use_color_correction);
-
-				totpaintops +=
-				    func(user, painter->cache.ibuf, painter->lastmousepos, finalpos);
-				painter->accumtime -= (double)brush->rate;
-			}
-
-			painter->lasttime = curtime;
-		}
-	}
-
-	painter->lastmousepos[0] = pos[0];
-	painter->lastmousepos[1] = pos[1];
-	painter->lastpressure = pressure;
-
-	BKE_brush_alpha_set(scene, brush, painter->startalpha);
-	BKE_brush_size_set(scene, brush, painter->startsize);
-	brush->jitter = painter->startjitter;
-	brush->spacing = painter->startspacing;
-
-	return totpaintops;
-}
-
-/* Image Paint Operations */
 
 /* keep these functions in sync */
 static void paint_2d_ibuf_rgb_get(ImBuf *ibuf, int x, int y, const short is_torus, float r_rgb[3])
@@ -892,51 +688,57 @@ static void paint_2d_canvas_free(ImagePaintState *s)
 	BKE_image_release_ibuf(s->brush->clone.image, s->clonecanvas, NULL);
 }
 
-static int paint_2d_sub_stroke(ImagePaintState *s, BrushPainter *painter, Image *image, float *uv, int update, float pressure)
+int paint_2d_stroke(void *ps, const int prev_mval[2], const int mval[2], int eraser)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(image, s->sima ? &s->sima->iuser : NULL, NULL);
-	float pos[2];
-	int is_data;
-
-	if (!ibuf)
-		return 0;
-
-	is_data = ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA;
-
-	pos[0] = uv[0] * ibuf->x;
-	pos[1] = uv[1] * ibuf->y;
-
-	brush_painter_2d_require_imbuf(painter, ((ibuf->rect_float) ? 1 : 0), 0, 0);
-
-	/* OCIO_TODO: float buffers are now always linear, so always use color correction
-	 *            this should probably be changed when texture painting color space is supported
-	 */
-	if (brush_painter_2d_paint(painter, paint_2d_op, pos, 0, pressure, s, is_data == FALSE)) {
-		if (update)
-			imapaint_image_update(s->sima, image, ibuf, false);
-		BKE_image_release_ibuf(image, ibuf, NULL);
-		return 1;
-	}
-	else {
-		BKE_image_release_ibuf(image, ibuf, NULL);
-		return 0;
-	}
-}
-
-int paint_2d_stroke(void *ps, const int mval[2], float pressure, int eraser)
-{
-	float newuv[2];
+	float newuv[2], olduv[2];
 	int redraw = 0;
 	ImagePaintState *s = ps;
 	BrushPainter *painter = s->painter;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL);
+	int	is_data = ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA;
+
+	if (!ibuf)
+		return 0;
 
 	s->blend = s->brush->blend;
 	if (eraser)
 		s->blend = IMB_BLEND_ERASE_ALPHA;
 
 	UI_view2d_region_to_view(s->v2d, mval[0], mval[1], &newuv[0], &newuv[1]);
-	redraw |= paint_2d_sub_stroke(s, painter, s->image, newuv,
-		                                    1, pressure);
+	UI_view2d_region_to_view(s->v2d, prev_mval[0], prev_mval[1], &olduv[0], &olduv[1]);
+
+	newuv[0] *= ibuf->x;
+	newuv[1] *= ibuf->y;
+
+	olduv[0] *= ibuf->x;
+	olduv[1] *= ibuf->y;
+
+	if (painter->firsttouch) {
+		/* paint exactly once on first touch */
+		painter->startpaintpos[0] = newuv[0];
+		painter->startpaintpos[1] = newuv[1];
+
+		painter->firsttouch = 0;
+		copy_v2_v2(painter->lastpaintpos, newuv);
+	} else {
+		copy_v2_v2(painter->lastpaintpos, olduv);
+	}
+	/* OCIO_TODO: float buffers are now always linear, so always use color correction
+	 *            this should probably be changed when texture painting color space is supported
+	 */
+	brush_painter_2d_require_imbuf(painter, ((ibuf->rect_float) ? 1 : 0), 0, 0);
+
+	if (painter->cache.enabled)
+		brush_painter_2d_refresh_cache(painter, newuv, is_data == FALSE);
+
+	if (paint_2d_op(s, painter->cache.ibuf, olduv, newuv)) {
+		imapaint_image_update(s->sima, s->image, ibuf, false);
+		BKE_image_release_ibuf(s->image, ibuf, NULL);
+		redraw |= 1;
+	}
+	else {
+		BKE_image_release_ibuf(s->image, ibuf, NULL);
+	}
 
 	if (redraw)
 		imapaint_clear_partial_redraw();

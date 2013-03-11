@@ -197,11 +197,11 @@ eV3DProjStatus ED_view3d_project_float_ex(struct ARegion *ar, float perspmat[4][
 eV3DProjStatus ED_view3d_project_float_global(struct ARegion *ar, const float co[3], float r_co[2], const eV3DProjTest flag);
 eV3DProjStatus ED_view3d_project_float_object(struct ARegion *ar, const float co[3], float r_co[2], const eV3DProjTest flag);
 
-int initgrabz(struct RegionView3D *rv3d, float x, float y, float z);
+float ED_view3d_calc_zfac(struct RegionView3D *rv3d, const float co[3], bool *r_flip);
 void ED_view3d_win_to_ray(struct ARegion *ar, struct View3D *v3d, const float mval[2], float ray_start[3], float ray_normal[3]);
 void ED_view3d_global_to_vector(struct RegionView3D *rv3d, const float coord[3], float vec[3]);
 void ED_view3d_win_to_3d(struct ARegion *ar, const float depth_pt[3], const float mval[2], float out[3]);
-void ED_view3d_win_to_delta(struct ARegion *ar, const float mval[2], float out[3]);
+void ED_view3d_win_to_delta(struct ARegion *ar, const float mval[2], float out[3], const float zfac);
 void ED_view3d_win_to_vector(struct ARegion *ar, const float mval[2], float out[3]);
 void ED_view3d_win_to_segment(struct ARegion *ar, struct View3D *v3d, const float mval[2], float ray_start[3], float ray_end[3]);
 int  ED_view3d_win_to_segment_clip(struct ARegion *ar, struct View3D *v3d, const float mval[2], float ray_start[3], float ray_end[3]);
@@ -255,7 +255,7 @@ short view3d_opengl_select(struct ViewContext *vc, unsigned int *buffer, unsigne
 void view3d_set_viewcontext(struct bContext *C, struct ViewContext *vc);
 void view3d_operator_needs_opengl(const struct bContext *C);
 void view3d_region_operator_needs_opengl(struct wmWindow *win, struct ARegion *ar);
-int view3d_get_view_aligned_coordinate(struct ViewContext *vc, float fp[3], const int mval[2], const short do_fallback);
+bool view3d_get_view_aligned_coordinate(struct ARegion *ar, float fp[3], const int mval[2], const bool do_fallback);
 void view3d_get_transformation(const struct ARegion *ar, struct RegionView3D *rv3d, struct Object *ob, struct bglMats *mats);
 
 /* XXX should move to BLI_math */

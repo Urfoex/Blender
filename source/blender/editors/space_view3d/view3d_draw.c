@@ -1565,7 +1565,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			float fac, asp, zoomx, zoomy;
 			float x1, y1, x2, y2;
 
-			ImBuf *ibuf = NULL, *freeibuf;
+			ImBuf *ibuf = NULL, *freeibuf, *releaseibuf;
 
 			Image *ima;
 			MovieClip *clip;
@@ -1575,6 +1575,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 				continue;
 
 			freeibuf = NULL;
+			releaseibuf = NULL;
 			if (bgpic->source == V3D_BGPIC_IMAGE) {
 				ima = bgpic->ima;
 				if (ima == NULL)
@@ -1585,7 +1586,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 				}
 				else {
 					ibuf = BKE_image_acquire_ibuf(ima, &bgpic->iuser, NULL);
-					freeibuf = ibuf;
+					releaseibuf = ibuf;
 				}
 
 				image_aspect[0] = ima->aspx;
@@ -1630,6 +1631,8 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			if ((ibuf->rect == NULL && ibuf->rect_float == NULL) || ibuf->channels != 4) { /* invalid image format */
 				if (freeibuf)
 					IMB_freeImBuf(freeibuf);
+				if (releaseibuf)
+					BKE_image_release_ibuf(ima, releaseibuf, NULL);
 
 				continue;
 			}
@@ -1702,10 +1705,12 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 				float tvec[3];
 				float sco[2];
 				const float mval_f[2] = {1.0f, 0.0f};
+				const float co_zero[3] = {0};
+				float zfac;
 
 				/* calc window coord */
-				initgrabz(rv3d, 0.0, 0.0, 0.0);
-				ED_view3d_win_to_delta(ar, mval_f, tvec);
+				zfac = ED_view3d_calc_zfac(rv3d, co_zero, NULL);
+				ED_view3d_win_to_delta(ar, mval_f, tvec, zfac);
 				fac = max_ff(fabsf(tvec[0]), max_ff(fabsf(tvec[1]), fabsf(tvec[2]))); /* largest abs axis */
 				fac = 1.0f / fac;
 
@@ -1725,6 +1730,8 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			if (x2 < 0 || y2 < 0 || x1 > ar->winx || y1 > ar->winy) {
 				if (freeibuf)
 					IMB_freeImBuf(freeibuf);
+				if (releaseibuf)
+					BKE_image_release_ibuf(ima, releaseibuf, NULL);
 
 				continue;
 			}
@@ -1783,9 +1790,10 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			glDepthMask(1);
 			if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 
-			if (freeibuf) {
+			if (freeibuf)
 				IMB_freeImBuf(freeibuf);
-			}
+			if (releaseibuf)
+				BKE_image_release_ibuf(ima, releaseibuf, NULL);
 		}
 	}
 }

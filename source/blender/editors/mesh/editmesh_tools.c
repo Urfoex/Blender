@@ -76,6 +76,8 @@
 
 #include "mesh_intern.h"
 
+#define USE_FACE_CREATE_SEL_EXTEND
+
 #define MVAL_PIXEL_MARGIN  5.0f
 
 /* allow accumulated normals to form a new direction but don't
@@ -332,10 +334,7 @@ static short edbm_extrude_edge(Object *obedit, BMEditMesh *em, const char hflag,
 					mult_m4_m4m4(mtx, imtx, obedit->obmat);
 				}
 
-				for (edge = BM_iter_new(&iter, bm, BM_EDGES_OF_MESH, NULL);
-				     edge;
-				     edge = BM_iter_step(&iter))
-				{
+				BM_ITER_MESH (edge, &iter, bm, BM_EDGES_OF_MESH) {
 					if (BM_elem_flag_test(edge, hflag) &&
 					    BM_edge_is_boundary(edge) &&
 					    BM_elem_flag_test(edge->l->f, hflag))
@@ -862,7 +861,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, wmEvent
 		copy_v3_v3(min, cent);
 
 		mul_m4_v3(vc.obedit->obmat, min);  /* view space */
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval, TRUE);
+		view3d_get_view_aligned_coordinate(vc.ar, min, event->mval, true);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 
 		sub_v3_v3(min, cent);
@@ -911,7 +910,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, wmEvent
 		BMOIter oiter;
 		
 		copy_v3_v3(min, curs);
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval, FALSE);
+		view3d_get_view_aligned_coordinate(vc.ar, min, event->mval, false);
 
 		invert_m4_m4(vc.obedit->imat, vc.obedit->obmat);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
@@ -1098,6 +1097,139 @@ static int edbm_add_edge_face__smooth_get(BMesh *bm)
 	return (vote_on_smooth[0] < vote_on_smooth[1]);
 }
 
+#ifdef USE_FACE_CREATE_SEL_EXTEND
+/**
+ * Function used to get a fixed number of edges linked to a vertex that passes a test function.
+ * This is used so we can request all boundary edges connected to a vertex for eg.
+ */
+static int edbm_add_edge_face_exec__vert_edge_lookup(BMVert *v, BMEdge *e_used, BMEdge **e_arr, const int e_arr_len,
+                                                     bool (* func)(BMEdge *))
+{
+	BMIter iter;
+	BMEdge *e_iter;
+	int i = 0;
+	BM_ITER_ELEM (e_iter, &iter, v, BM_EDGES_OF_VERT) {
+		if (BM_elem_flag_test(e_iter, BM_ELEM_HIDDEN) == false) {
+			if ((e_used == NULL) || (e_used != e_iter)) {
+				if (func(e_iter)) {
+					e_arr[i++] = e_iter;
+					if (i >= e_arr_len) {
+						break;
+					}
+				}
+			}
+		}
+	}
+	return i;
+}
+
+static BMElem *edbm_add_edge_face_exec__tricky_extend_sel(BMesh *bm)
+{
+	BMIter iter;
+	bool found = false;
+
+	if (bm->totvertsel == 1 && bm->totedgesel == 0 && bm->totfacesel == 0) {
+		/* first look for 2 boundary edges */
+		BMVert *v;
+
+		BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+			if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+				found = true;
+				break;
+			}
+		}
+
+		if (found) {
+			BMEdge *ed_pair[3];
+			if (
+			    ((edbm_add_edge_face_exec__vert_edge_lookup(v, NULL, ed_pair, 3, BM_edge_is_wire) == 2) &&
+			     (BM_edge_share_face_check(ed_pair[0], ed_pair[1]) == false)) ||
+
+			    ((edbm_add_edge_face_exec__vert_edge_lookup(v, NULL, ed_pair, 3, BM_edge_is_boundary) == 2) &&
+			     (BM_edge_share_face_check(ed_pair[0], ed_pair[1]) == false))
+			    )
+			{
+				BMEdge *e_other = BM_edge_exists(BM_edge_other_vert(ed_pair[0], v),
+				                                 BM_edge_other_vert(ed_pair[1], v));
+				BM_edge_select_set(bm, ed_pair[0], true);
+				BM_edge_select_set(bm, ed_pair[1], true);
+				if (e_other) {
+					BM_edge_select_set(bm, e_other, true);
+				}
+				return (BMElem *)v;
+			}
+		}
+	}
+	else if (bm->totvertsel == 2 && bm->totedgesel == 1 && bm->totfacesel == 0) {
+		/* first look for 2 boundary edges */
+		BMEdge *e;
+
+		BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+			if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			BMEdge *ed_pair_v1[2];
+			BMEdge *ed_pair_v2[2];
+			if (
+			    ((edbm_add_edge_face_exec__vert_edge_lookup(e->v1, e, ed_pair_v1, 2, BM_edge_is_wire) == 1) &&
+			     (edbm_add_edge_face_exec__vert_edge_lookup(e->v2, e, ed_pair_v2, 2, BM_edge_is_wire) == 1) &&
+			     (BM_edge_share_face_check(e, ed_pair_v1[0]) == false) &&
+			     (BM_edge_share_face_check(e, ed_pair_v2[0]) == false)) ||
+
+			    ((edbm_add_edge_face_exec__vert_edge_lookup(e->v1, e, ed_pair_v1, 2, BM_edge_is_boundary) == 1) &&
+			     (edbm_add_edge_face_exec__vert_edge_lookup(e->v2, e, ed_pair_v2, 2, BM_edge_is_boundary) == 1) &&
+			     (BM_edge_share_face_check(e, ed_pair_v1[0]) == false) &&
+			     (BM_edge_share_face_check(e, ed_pair_v2[0]) == false))
+			    )
+			{
+				BMEdge *e_other = BM_edge_exists(BM_edge_other_vert(ed_pair_v1[0], e->v1),
+				                                 BM_edge_other_vert(ed_pair_v2[0], e->v2));
+				BM_edge_select_set(bm, ed_pair_v1[0], true);
+				BM_edge_select_set(bm, ed_pair_v2[0], true);
+				if (e_other) {
+					BM_edge_select_set(bm, e_other, true);
+				}
+				return (BMElem *)e;
+			}
+		}
+	}
+
+	return NULL;
+}
+static void edbm_add_edge_face_exec__tricky_finalize_sel(BMesh *bm, BMElem *ele_desel, BMFace *f)
+{
+	/* now we need to find the edge that isnt connected to this element */
+	BM_select_history_clear(bm);
+
+	if (ele_desel->head.htype == BM_VERT) {
+		BMLoop *l = BM_face_vert_share_loop(f, (BMVert *)ele_desel);
+		BLI_assert(f->len == 3);
+		BM_face_select_set(bm, f, false);
+		BM_vert_select_set(bm, (BMVert *)ele_desel, false);
+
+		BM_edge_select_set(bm, l->next->e, true);
+		BM_select_history_store(bm, l->next->e);
+	}
+	else {
+		BMLoop *l = BM_face_edge_share_loop(f, (BMEdge *)ele_desel);
+		BLI_assert(f->len == 4 || f->len == 3);
+		BM_face_select_set(bm, f, false);
+		BM_edge_select_set(bm, (BMEdge *)ele_desel, false);
+		if (f->len == 4) {
+			BM_edge_select_set(bm, l->next->next->e, true);
+			BM_select_history_store(bm, l->next->next->e);
+		}
+		else {
+			BM_vert_select_set(bm, l->next->next->v, true);
+			BM_select_history_store(bm, l->next->next->v);
+		}
+	}
+}
+#endif  /* USE_FACE_CREATE_SEL_EXTEND */
+
 static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 {
 	BMOperator bmop;
@@ -1105,6 +1237,15 @@ static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	const short use_smooth = edbm_add_edge_face__smooth_get(em->bm);
 	/* when this is used to dissolve we could avoid this, but checking isnt too slow */
+
+#ifdef USE_FACE_CREATE_SEL_EXTEND
+	BMElem *ele_desel;
+	BMFace *ele_desel_face;
+
+	/* be extra clever, figure out if a partial selection should be extended so we can create geometry
+	 * with single vert or single edge selection */
+	ele_desel = edbm_add_edge_face_exec__tricky_extend_sel(em->bm);
+#endif
 
 	if (!EDBM_op_init(em, &bmop, op,
 	                  "contextual_create geom=%hfev mat_nr=%i use_smooth=%b",
@@ -1114,8 +1255,22 @@ static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 	}
 	
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "faces.out", BM_FACE, BM_ELEM_SELECT, TRUE);
-	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "edges.out", BM_EDGE, BM_ELEM_SELECT, TRUE);
+
+#ifdef USE_FACE_CREATE_SEL_EXTEND
+	/* normally we would want to leave the new geometry selected,
+	 * but being able to press F many times to add geometry is too useful! */
+	if (ele_desel &&
+	    (BMO_slot_buffer_count(bmop.slots_out, "faces.out") == 1) &&
+	    (ele_desel_face = BMO_slot_buffer_get_first(bmop.slots_out, "faces.out")))
+	{
+		edbm_add_edge_face_exec__tricky_finalize_sel(em->bm, ele_desel, ele_desel_face);
+	}
+	else
+#endif
+	{
+		BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "faces.out", BM_FACE, BM_ELEM_SELECT, true);
+		BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "edges.out", BM_EDGE, BM_ELEM_SELECT, true);
+	}
 
 	if (!EDBM_op_finish(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -3762,9 +3917,10 @@ static int edbm_screw_exec(bContext *C, wmOperator *op)
 	/* find two vertices with valence count == 1, more or less is wrong */
 	v1 = NULL;
 	v2 = NULL;
-	for (eve = BM_iter_new(&iter, em->bm, BM_VERTS_OF_MESH, NULL); eve; eve = BM_iter_step(&iter)) {
+
+	BM_ITER_MESH (eve, &iter, em->bm, BM_VERTS_OF_MESH) {
 		valence = 0;
-		for (eed = BM_iter_new(&eiter, em->bm, BM_EDGES_OF_VERT, eve); eed; eed = BM_iter_step(&eiter)) {
+		BM_ITER_ELEM (eed, &eiter, eve, BM_EDGES_OF_VERT) {
 			if (BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
 				valence++;
 			}
@@ -4508,7 +4664,7 @@ static int edbm_sort_elements_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop
 	int action = RNA_enum_get(ptr, "type");
 
 	/* Only show seed for randomize action! */
-	if (strcmp(prop_id, "seed") == 0) {
+	if (STREQ(prop_id, "seed")) {
 		if (action == SRT_RANDOMIZE)
 			return TRUE;
 		else
@@ -4516,7 +4672,7 @@ static int edbm_sort_elements_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop
 	}
 
 	/* Hide seed for reverse and randomize actions! */
-	if (strcmp(prop_id, "reverse") == 0) {
+	if (STREQ(prop_id, "reverse")) {
 		if (ELEM(action, SRT_RANDOMIZE, SRT_REVERSE))
 			return FALSE;
 		else

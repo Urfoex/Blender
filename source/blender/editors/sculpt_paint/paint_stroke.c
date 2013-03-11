@@ -104,18 +104,16 @@ static void paint_draw_smooth_stroke(bContext *C, int x, int y, void *customdata
 	Brush *brush = paint_brush(paint);
 	PaintStroke *stroke = customdata;
 
-	glColor4ubv(paint->paint_cursor_col);
-	glEnable(GL_LINE_SMOOTH);
-	glEnable(GL_BLEND);
-
 	if (stroke && brush && (brush->flag & BRUSH_SMOOTH_STROKE)) {
-		ARegion *ar = CTX_wm_region(C);
-		sdrawline(x, y, (int)stroke->last_mouse_position[0] - ar->winrct.xmin,
-		          (int)stroke->last_mouse_position[1] - ar->winrct.ymin);
-	}
+		glColor4ubv(paint->paint_cursor_col);
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_BLEND);
 
-	glDisable(GL_BLEND);
-	glDisable(GL_LINE_SMOOTH);
+		sdrawline(x, y, (int)stroke->last_mouse_position[0],
+		          (int)stroke->last_mouse_position[1]);
+		glDisable(GL_BLEND);
+		glDisable(GL_LINE_SMOOTH);
+	}
 }
 
 /* if this is a tablet event, return tablet pressure and set *pen_flip
@@ -155,6 +153,26 @@ static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, wmEvent *ev
 	/* see if tablet affects event */
 	pressure = event_tablet_data(event, &pen_flip);
 
+/* the following code is adapted from texture paint. It may not be needed but leaving here
+ * just in case for reference (code in texpaint removed as part of refactoring).
+ * It's strange that only texpaint had these guards. */
+#if 0
+	/* special exception here for too high pressure values on first touch in
+	 * windows for some tablets, then we just skip first touch ..  */
+	if (tablet && (pressure >= 0.99f) && ((pop->s.brush->flag & BRUSH_SPACING_PRESSURE) || BKE_brush_use_alpha_pressure(scene, pop->s.brush) || BKE_brush_use_size_pressure(scene, pop->s.brush)))
+		return;
+
+	/* This can be removed once fixed properly in
+	 * BKE_brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, double time, float pressure, void *user)
+	 * at zero pressure we should do nothing 1/2^12 is 0.0002 which is the sensitivity of the most sensitive pen tablet available */
+	if (tablet && (pressure < 0.0002f) && ((pop->s.brush->flag & BRUSH_SPACING_PRESSURE) || BKE_brush_use_alpha_pressure(scene, pop->s.brush) || BKE_brush_use_size_pressure(scene, pop->s.brush)))
+		return;
+#endif
+
+	/* copy last position -before- jittering, or space fill code
+	 * will create too many dabs */
+	copy_v2_v2(stroke->last_mouse_position, mouse_in);
+
 	/* TODO: as sculpt and other paint modes are unified, this
 	 * separation will go away */
 	if (paint_supports_jitter(mode)) {
@@ -188,8 +206,6 @@ static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, wmEvent *ev
 	RNA_float_set_array(&itemptr, "mouse", mouse_out);
 	RNA_boolean_set(&itemptr, "pen_flip", pen_flip);
 	RNA_float_set(&itemptr, "pressure", pressure);
-
-	copy_v2_v2(stroke->last_mouse_position, mouse_out);
 
 	stroke->update_step(C, stroke, &itemptr);
 }
@@ -247,17 +263,30 @@ static int paint_space_stroke(bContext *C, wmOperator *op, wmEvent *event, const
 			const Scene *scene = CTX_data_scene(C);
 			int steps;
 			int i;
-			float pressure = 1.0f;
+			float size_pressure = 1.0f;
+			float pressure = event_tablet_data(event, NULL);
 
 			/* XXX mysterious :) what has 'use size' do with this here... if you don't check for it, pressure fails */
 			if (BKE_brush_use_size_pressure(scene, stroke->brush))
-				pressure = event_tablet_data(event, NULL);
+				size_pressure = pressure;
 			
-			if (pressure > FLT_EPSILON) {
+			if (size_pressure > FLT_EPSILON) {
+				float zoomx, zoomy;
 				/* brushes can have a minimum size of 1.0 but with pressure it can be smaller then a pixel
 				 * causing very high step sizes, hanging blender [#32381] */
-				const float size_clamp = max_ff(1.0f, BKE_brush_size_get(scene, stroke->brush) * pressure);
-				scale = (size_clamp * stroke->brush->spacing / 50.0f) / length;
+				const float size_clamp = max_ff(1.0f, BKE_brush_size_get(scene, stroke->brush) * size_pressure);
+				float spacing = stroke->brush->spacing;
+
+				/* stroke system is used for 2d paint too, so we need to account for
+				 * the fact that brush can be scaled there. */
+				get_imapaint_zoom(C, &zoomx, &zoomy);
+
+				if (stroke->brush->flag & BRUSH_SPACING_PRESSURE)
+					spacing = max_ff(1.0f, spacing * (1.5f - pressure));
+
+				spacing *= max_ff(zoomx, zoomy);
+
+				scale = (size_clamp * spacing / 50.0f) / length;
 				if (scale > FLT_EPSILON) {
 					mul_v2_fl(vec, scale);
 
@@ -340,7 +369,7 @@ bool paint_supports_dynamic_size(Brush *br)
 
 bool paint_supports_jitter(PaintMode mode)
 {
-	return ELEM(mode, PAINT_SCULPT, PAINT_TEXTURE_PROJECTIVE);
+	return ELEM3(mode, PAINT_SCULPT, PAINT_TEXTURE_PROJECTIVE, PAINT_TEXTURE_2D);
 }
 
 #define PAINT_STROKE_MODAL_CANCEL 1
