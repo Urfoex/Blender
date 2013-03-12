@@ -450,7 +450,7 @@ static float VecZDepthPersp(const float pt[2],
 
 
 /* Return the top-most face index that the screen space coord 'pt' touches (or -1) */
-static int project_paint_PickFace(const ProjPaintState *ps, float pt[2], float w[3], int *side)
+static int project_paint_PickFace(const ProjPaintState *ps, const float pt[2], float w[3], int *side)
 {
 	LinkNode *node;
 	float w_tmp[3];
@@ -526,7 +526,8 @@ static void uvco_to_wrapped_pxco(float uv[2], int ibuf_x, int ibuf_y, float *x, 
 }
 
 /* Set the top-most face color that the screen space coord 'pt' touches (or return 0 if none touch) */
-static int project_paint_PickColor(const ProjPaintState *ps, float pt[2], float *rgba_fp, unsigned char *rgba, const int interp)
+static int project_paint_PickColor(const ProjPaintState *ps, const float pt[2],
+                                   float *rgba_fp, unsigned char *rgba, const int interp)
 {
 	float w[3], uv[2];
 	int side;
@@ -951,7 +952,8 @@ static int check_seam(const ProjPaintState *ps, const int orig_face, const int o
 /* Calculate outset UV's, this is not the same as simply scaling the UVs,
  * since the outset coords are a margin that keep an even distance from the original UV's,
  * note that the image aspect is taken into account */
-static void uv_image_outset(float (*orig_uv)[2], float (*outset_uv)[2], const float scaler, const int ibuf_x, const int ibuf_y, const int is_quad)
+static void uv_image_outset(float (*orig_uv)[2], float (*outset_uv)[2], const float scaler,
+                            const int ibuf_x, const int ibuf_y, const int is_quad)
 {
 	float a1, a2, a3, a4 = 0.0f;
 	float puv[4][2]; /* pixelspace uv's */
@@ -1132,7 +1134,8 @@ static void screen_px_from_persp(
 	interp_v3_v3v3v3(pixelScreenCo, v1co, v2co, v3co, w);
 }
 
-static void project_face_pixel(const MTFace *tf_other, ImBuf *ibuf_other, const float w[3], int side, unsigned char rgba_ub[4], float rgba_f[4])
+static void project_face_pixel(const MTFace *tf_other, ImBuf *ibuf_other, const float w[3],
+                               int side, unsigned char rgba_ub[4], float rgba_f[4])
 {
 	float *uvCo1, *uvCo2, *uvCo3;
 	float uv_other[2], x, y;
@@ -1376,15 +1379,18 @@ static ProjPixel *project_paint_uvpixel_init(
 					}
 					else { /* from char to float */
 						unsigned char rgba_ub[4];
+						float rgba[4];
 						project_face_pixel(tf_other, ibuf_other, w, side, rgba_ub, NULL);
-						IMAPAINT_CHAR_RGBA_TO_FLOAT(((ProjPixelClone *)projPixel)->clonepx.f, rgba_ub);
+						srgb_to_linearrgb_uchar4(rgba, rgba_ub);
+						straight_to_premul_v4_v4(((ProjPixelClone *)projPixel)->clonepx.f, rgba);
 					}
 				}
 				else {
 					if (ibuf_other->rect_float) { /* float to char */
 						float rgba[4];
 						project_face_pixel(tf_other, ibuf_other, w, side, NULL, rgba);
-						IMAPAINT_FLOAT_RGBA_TO_CHAR(((ProjPixelClone *)projPixel)->clonepx.ch, rgba);
+						premul_to_straight_v4(rgba);
+						linearrgb_to_srgb_uchar3(((ProjPixelClone *)projPixel)->clonepx.ch, rgba);
 					}
 					else { /* char to char */
 						project_face_pixel(tf_other, ibuf_other, w, side, ((ProjPixelClone *)projPixel)->clonepx.ch, NULL);
@@ -3231,7 +3237,7 @@ static void project_paint_begin(ProjPaintState *ps)
 	BLI_linklist_free(image_LinkList, NULL);
 }
 
-static void paint_proj_begin_clone(ProjPaintState *ps, int mouse[2])
+static void paint_proj_begin_clone(ProjPaintState *ps, const int mouse[2])
 {
 	/* setup clone offset */
 	if (ps->tool == PAINT_TOOL_CLONE) {
@@ -3612,7 +3618,8 @@ static void do_projectpaint_clone_f(ProjPaintState *ps, ProjPixel *projPixel, fl
  * accumulation of color greater then 'projPixel->mask' however in the case of smear its not
  * really that important to be correct as it is with clone and painting
  */
-static void do_projectpaint_smear(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask, MemArena *smearArena, LinkNode **smearPixels, float co[2])
+static void do_projectpaint_smear(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask,
+                                  MemArena *smearArena, LinkNode **smearPixels, const float co[2])
 {
 	unsigned char rgba_ub[4];
 
@@ -3623,7 +3630,8 @@ static void do_projectpaint_smear(ProjPaintState *ps, ProjPixel *projPixel, floa
 	BLI_linklist_prepend_arena(smearPixels, (void *)projPixel, smearArena);
 }
 
-static void do_projectpaint_smear_f(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask, MemArena *smearArena, LinkNode **smearPixels_f, float co[2])
+static void do_projectpaint_smear_f(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask,
+                                    MemArena *smearArena, LinkNode **smearPixels_f, const float co[2])
 {
 	float rgba[4];
 
@@ -3644,7 +3652,8 @@ static float inv_pow2(float f)
 	return 1.0f - f;
 }
 
-static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask, MemArena *softenArena, LinkNode **softenPixels)
+static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask,
+                                     MemArena *softenArena, LinkNode **softenPixels)
 {
 	unsigned int accum_tot = 0;
 	unsigned int i;
@@ -3676,7 +3685,8 @@ static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, f
 	}
 }
 
-static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask, MemArena *softenArena, LinkNode **softenPixels)
+static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask,
+                                   MemArena *softenArena, LinkNode **softenPixels)
 {
 	unsigned int accum_tot = 0;
 	unsigned int i;
@@ -3741,26 +3751,16 @@ static void do_projectpaint_draw(ProjPaintState *ps, ProjPixel *projPixel, const
 	}
 }
 
-static void do_projectpaint_draw_f(ProjPaintState *ps, ProjPixel *projPixel, float rgba[4], float alpha, float mask, int use_color_correction)
+static void do_projectpaint_draw_f(ProjPaintState *ps, ProjPixel *projPixel, float rgba[4], float alpha, float mask)
 {
 	if (ps->is_texbrush) {
 		/* rgba already holds a texture result here from higher level function */
-		if (use_color_correction) {
-			float rgba_br[3];
-			srgb_to_linearrgb_v3_v3(rgba_br, ps->brush->rgb);
-			mul_v3_v3(rgba, rgba_br);
-		}
-		else {
-			mul_v3_v3(rgba, ps->brush->rgb);
-		}
+		float rgba_br[3];
+		srgb_to_linearrgb_v3_v3(rgba_br, ps->brush->rgb);
+		mul_v3_v3(rgba, rgba_br);
 	}
 	else {
-		if (use_color_correction) {
-			srgb_to_linearrgb_v3_v3(rgba, ps->brush->rgb);
-		}
-		else {
-			copy_v3_v3(rgba, ps->brush->rgb);
-		}
+		srgb_to_linearrgb_v3_v3(rgba, ps->brush->rgb);
 		rgba[3] = 1.0;
 	}
 
@@ -3800,7 +3800,6 @@ static void *do_projectpaint_thread(void *ph_v)
 	float falloff;
 	int bucket_index;
 	int is_floatbuf = 0;
-	int use_color_correction = FALSE;
 	const short tool =  ps->tool;
 	rctf bucket_bounds;
 
@@ -3856,7 +3855,6 @@ static void *do_projectpaint_thread(void *ph_v)
 
 					last_projIma->touch = 1;
 					is_floatbuf = last_projIma->ibuf->rect_float ? 1 : 0;
-					use_color_correction = TRUE;
 				}
 				/* end copy */
 
@@ -3952,7 +3950,6 @@ static void *do_projectpaint_thread(void *ph_v)
 
 								last_projIma->touch = 1;
 								is_floatbuf = last_projIma->ibuf->rect_float ? 1 : 0;
-								use_color_correction = TRUE;
 							}
 							/* end copy */
 
@@ -3988,7 +3985,7 @@ static void *do_projectpaint_thread(void *ph_v)
 									else do_projectpaint_soften(ps, projPixel, alpha, mask, softenArena, &softenPixels);
 									break;
 								default:
-									if (is_floatbuf) do_projectpaint_draw_f(ps, projPixel, rgba, alpha, mask, use_color_correction);
+									if (is_floatbuf) do_projectpaint_draw_f(ps, projPixel, rgba, alpha, mask);
 									else do_projectpaint_draw(ps, projPixel, rgba, alpha, mask);
 									break;
 							}
@@ -4154,7 +4151,7 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps)
 		/* disable for 3d mapping also because painting on mirrored mesh can create "stripes" */
 		ps->do_masking = (brush->flag & BRUSH_AIRBRUSH || brush->mtex.brush_map_mode == MTEX_MAP_MODE_VIEW ||
 		                  brush->mtex.brush_map_mode == MTEX_MAP_MODE_3D) ? false : true;
-		ps->is_texbrush = (brush->mtex.tex) ? 1 : 0;
+		ps->is_texbrush = (brush->mtex.tex && brush->imagepaint_tool == PAINT_TOOL_DRAW) ? 1 : 0;
 	}
 	else {
 		/* brush may be NULL*/
@@ -4209,7 +4206,8 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps)
 	return;
 }
 
-void *paint_proj_new_stroke(bContext *C, Object *ob, int mouse[2]) {
+void *paint_proj_new_stroke(bContext *C, Object *ob, const int mouse[2])
+{
 	ProjPaintState *ps = MEM_callocN(sizeof(ProjPaintState), "ProjectionPaintState");
 	project_state_init(C, ob, ps);
 

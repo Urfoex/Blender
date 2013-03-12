@@ -837,7 +837,8 @@ static int start_ffmpeg_impl(struct RenderData *rd, int rectx, int recty, Report
 	}
 	if (avformat_write_header(of, NULL) < 0) {
 		BKE_report(reports, RPT_ERROR, "Could not initialize streams, probably unsupported codec combination");
-			av_dict_free(&opts);
+		av_dict_free(&opts);
+		avio_close(of->pb);
 		return 0;
 	}
 
@@ -980,7 +981,6 @@ int BKE_ffmpeg_start(struct Scene *scene, RenderData *rd, int rectx, int recty, 
 	return success;
 }
 
-void BKE_ffmpeg_end(void);
 static void end_ffmpeg_impl(int is_autosplit);
 
 #ifdef WITH_AUDASPACE

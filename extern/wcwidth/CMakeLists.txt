@@ -14,53 +14,25 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Jacques Beaurain.
+# The Original Code is Copyright (C) 2013, Blender Foundation
+# All rights reserved.
+#
+# The Original Code is: all of this file.
+#
+# Contributor(s): none yet.
 #
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../include
-	../uvedit
-	../../blenkernel
-	../../blenlib
-	../../blenfont
-	../../blenloader
-	../../bmesh
-	../../gpu
-	../../imbuf
-	../../makesdna
-	../../makesrna
-	../../render/extern/include
-	../../windowmanager
-	../../../../intern/guardedalloc
+	.
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+
 )
 
 set(SRC
-	paint_cursor.c
-	paint_hide.c
-	paint_image.c
-	paint_image_2d.c
-	paint_image_proj.c
-	paint_mask.c
-	paint_ops.c
-	paint_stroke.c
-	paint_undo.c
-	paint_utils.c
-	paint_vertex.c
-	sculpt.c
-	sculpt_undo.c
-	sculpt_uv.c
-
-	paint_intern.h
-	sculpt_intern.h
+	wcwidth.c
 )
 
-if(WITH_INTERNATIONAL)
-	add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-blender_add_lib(bf_editor_sculpt_paint "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(extern_wcwidth "${SRC}" "${INC}" "${INC_SYS}")

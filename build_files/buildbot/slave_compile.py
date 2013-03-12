@@ -21,6 +21,7 @@
 import os
 import subprocess
 import sys
+import shutil
 
 # get builder name
 if len(sys.argv) < 2:
@@ -70,8 +71,6 @@ else:
     config_dir = os.path.join(buildbot_dir, 'config')
 
     if builder.find('linux') != -1:
-        import shutil
-
         configs = []
         if builder.endswith('linux_glibc211_x86_64_scons'):
             configs = ['user-config-player-glibc211-x86_64.py',
@@ -137,6 +136,8 @@ else:
             if builder.find('win64') != -1:
                 bitness = '64'
 
+            scons_options.append('BF_INSTALLDIR=' + install_dir)
+            scons_options.append('BF_BUILDDIR=' + build_dir)
             scons_options.append('BF_BITNESS=' + bitness)
             scons_options.append('WITH_BF_CYCLES_CUDA_BINARIES=True')
             scons_options.append('BF_CYCLES_CUDA_NVCC=nvcc.exe')
@@ -152,4 +153,12 @@ else:
             scons_options.append('BF_CONFIG=' + os.path.join(config_dir, config))
 
         retcode = subprocess.call(['python', 'scons/scons.py'] + scons_options)
+        if retcode == 0:
+            dlls = ('msvcm90.dll', 'msvcp90.dll', 'msvcr90.dll', 'vcomp90.dll', 'Microsoft.VC90.CRT.manifest', 'Microsoft.VC90.OpenMP.manifest')
+            if bitness == '32':
+               dlls_path = 'C:\\b\\redist\\x86'
+            else:
+               dlls_path = 'C:\\b\\redist\\amd64'
+            for dll in dlls:
+                shutil.copyfile(os.path.join(dlls_path, dll), os.path.join(install_dir, dll))
         sys.exit(retcode)
