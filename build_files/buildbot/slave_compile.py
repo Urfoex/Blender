@@ -143,7 +143,6 @@ else:
             scons_options.append('BF_CYCLES_CUDA_NVCC=nvcc.exe')
             if builder.find('mingw') != -1:
                 scons_options.append('BF_TOOLSET=mingw')
-
         elif builder.find('mac') != -1:
             if builder.find('x86_64') != -1:
                 config = 'user-config-mac-x86_64.py'
@@ -153,12 +152,14 @@ else:
             scons_options.append('BF_CONFIG=' + os.path.join(config_dir, config))
 
         retcode = subprocess.call(['python', 'scons/scons.py'] + scons_options)
-        if retcode == 0:
+
+        if builder.find('win') != -1:
             dlls = ('msvcm90.dll', 'msvcp90.dll', 'msvcr90.dll', 'vcomp90.dll', 'Microsoft.VC90.CRT.manifest', 'Microsoft.VC90.OpenMP.manifest')
-            if bitness == '32':
+            if builder.find('win64') == -1:
                dlls_path = 'C:\\b\\redist\\x86'
             else:
                dlls_path = 'C:\\b\\redist\\amd64'
             for dll in dlls:
                 shutil.copyfile(os.path.join(dlls_path, dll), os.path.join(install_dir, dll))
+
         sys.exit(retcode)
