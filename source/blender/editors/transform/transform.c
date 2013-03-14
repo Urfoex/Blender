@@ -866,7 +866,7 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 	}
 }
 
-int transformEvent(TransInfo *t, wmEvent *event)
+int transformEvent(TransInfo *t, const wmEvent *event)
 {
 	float mati[3][3] = MAT3_UNITY;
 	char cmode = constraintModeToChar(t);
@@ -1860,7 +1860,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 }
 
 /* note: caller needs to free 't' on a 0 return */
-int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int mode)
+int initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *event, int mode)
 {
 	int options = 0;
 	PropertyRNA *prop;
@@ -2665,7 +2665,7 @@ void initWarp(TransInfo *t)
 	t->val = (max[0] - min[0]) / 2.0f; /* t->val is X dimension projected boundbox */
 }
 
-int handleEventWarp(TransInfo *t, wmEvent *event)
+int handleEventWarp(TransInfo *t, const wmEvent *event)
 {
 	int status = 0;
 	
@@ -2806,7 +2806,7 @@ void initShear(TransInfo *t)
 	t->flag |= T_NO_CONSTRAINT;
 }
 
-int handleEventShear(TransInfo *t, wmEvent *event)
+int handleEventShear(TransInfo *t, const wmEvent *event)
 {
 	int status = 0;
 	
@@ -3583,12 +3583,15 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 		if ((t->flag & T_V3D_ALIGN) == 0) { // align mode doesn't rotate objects itself
 			/* euler or quaternion? */
 			if ((td->ext->rotOrder == ROT_MODE_QUAT) || (td->flag & TD_USEQUAT)) {
-				mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
-				mat3_to_quat(quat, fmat);   // Actual transform
-				
-				mul_qt_qtqt(td->ext->quat, quat, td->ext->iquat);
-				/* this function works on end result */
-				protectedQuaternionBits(td->protectflag, td->ext->quat, td->ext->iquat);
+				/* can be called for texture space translate for example, then opt out */
+				if (td->ext->quat) {
+					mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
+					mat3_to_quat(quat, fmat);   // Actual transform
+					
+					mul_qt_qtqt(td->ext->quat, quat, td->ext->iquat);
+					/* this function works on end result */
+					protectedQuaternionBits(td->protectflag, td->ext->quat, td->ext->iquat);
+				}
 			}
 			else if (td->ext->rotOrder == ROT_MODE_AXISANGLE) {
 				/* calculate effect based on quats */
@@ -4511,7 +4514,7 @@ void initBevel(TransInfo *t)
 	}
 }
 
-int handleEventBevel(TransInfo *t, wmEvent *event)
+int handleEventBevel(TransInfo *t, const wmEvent *event)
 {
 	if (event->val == KM_PRESS) {
 		if (!G.editBMesh) return 0;
@@ -5764,7 +5767,7 @@ void initEdgeSlide(TransInfo *t)
 	t->flag |= T_NO_CONSTRAINT | T_NO_PROJECT;
 }
 
-int handleEventEdgeSlide(struct TransInfo *t, struct wmEvent *event)
+int handleEventEdgeSlide(struct TransInfo *t, const struct wmEvent *event)
 {
 	if (t->mode == TFM_EDGE_SLIDE) {
 		EdgeSlideData *sld = t->customData;
@@ -6271,7 +6274,7 @@ void initVertSlide(TransInfo *t)
 	t->flag |= T_NO_CONSTRAINT | T_NO_PROJECT;
 }
 
-int handleEventVertSlide(struct TransInfo *t, struct wmEvent *event)
+int handleEventVertSlide(struct TransInfo *t, const struct wmEvent *event)
 {
 	if (t->mode == TFM_VERT_SLIDE) {
 		VertSlideData *sld = t->customData;
@@ -6483,16 +6486,16 @@ int VertSlide(TransInfo *t, const int UNUSED(mval[2]))
 		char c[NUM_STR_REP_LEN];
 		applyNumInput(&t->num, &final);
 		outputNumInput(&(t->num), c);
-		ofs += BLI_snprintf(str, MAX_INFO_LEN - ofs, "%s", &c[0]);
+		ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, "%s", &c[0]);
 	}
 	else {
-		ofs += BLI_snprintf(str, MAX_INFO_LEN - ofs, "%.4f ", final);
+		ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, "%.4f ", final);
 	}
-	ofs += BLI_snprintf(str, MAX_INFO_LEN - ofs, IFACE_("(E)ven: %s, "), !is_proportional ? on_str : off_str);
+	ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, IFACE_("(E)ven: %s, "), !is_proportional ? on_str : off_str);
 	if (!is_proportional) {
-		ofs += BLI_snprintf(str, MAX_INFO_LEN - ofs, IFACE_("(F)lipped: %s, "), flipped ? on_str : off_str);
+		ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, IFACE_("(F)lipped: %s, "), flipped ? on_str : off_str);
 	}
-	ofs += BLI_snprintf(str, MAX_INFO_LEN - ofs, IFACE_("Alt or (C)lamp: %s"), is_clamp ? on_str : off_str);
+	ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, IFACE_("Alt or (C)lamp: %s"), is_clamp ? on_str : off_str);
 	/* done with header string */
 
 	/*do stuff here*/

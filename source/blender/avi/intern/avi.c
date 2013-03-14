@@ -38,12 +38,15 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#ifdef WIN32
+#include "BLI_winstuff.h"
+#endif
+
 #include "MEM_guardedalloc.h"
 #include "MEM_sys_types.h"
 
-#ifdef WIN32
-#  include "BLI_winstuff.h"
-#endif
+#include "BLI_utildefines.h"
+#include "BLI_fileops.h"
 
 #include "AVI_avi.h"
 #include "avi_intern.h"
@@ -208,7 +211,7 @@ int AVI_is_avi(char *name)
 	FILE *fp;
 	int ret;
 	
-	fp = fopen(name, "rb");
+	fp = BLI_fopen(name, "rb");
 	if (fp == NULL)
 		return 0;
 
@@ -238,7 +241,7 @@ int AVI_is_avi(const char *name)
 	DEBUG_PRINT("opening movie\n");
 
 	movie.type = AVI_MOVIE_READ;
-	movie.fp = fopen(name, "rb");
+	movie.fp = BLI_fopen(name, "rb");
 	movie.offset_table = NULL;
 
 	if (movie.fp == NULL)
@@ -441,7 +444,7 @@ AviError AVI_open_movie(const char *name, AviMovie *movie)
 	memset(movie, 0, sizeof(AviMovie));
 
 	movie->type = AVI_MOVIE_READ;
-	movie->fp = fopen(name, "rb");
+	movie->fp = BLI_fopen(name, "rb");
 	movie->offset_table = NULL;
 
 	if (movie->fp == NULL)
@@ -765,7 +768,7 @@ AviError AVI_open_compress(char *name, AviMovie *movie, int streams, ...)
 	int64_t junk_pos;
 
 	movie->type = AVI_MOVIE_WRITE;
-	movie->fp = fopen(name, "wb");
+	movie->fp = BLI_fopen(name, "wb");
 
 	movie->index_entries = 0;
 

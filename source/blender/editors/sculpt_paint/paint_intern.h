@@ -66,11 +66,12 @@ void paint_stroke_data_free(struct wmOperator *op);
 
 bool paint_space_stroke_enabled(struct Brush *br, enum PaintMode mode);
 bool paint_supports_dynamic_size(struct Brush *br, enum PaintMode mode);
-bool paint_supports_moving_texture(struct Brush *br, enum PaintMode mode);
+bool paint_supports_dynamic_tex_coords(struct Brush *br, enum PaintMode mode);
+bool paint_supports_smooth_stroke(struct Brush *br, enum PaintMode mode);
 bool paint_supports_jitter(enum PaintMode mode);
 
 struct wmKeyMap *paint_stroke_modal_keymap(struct wmKeyConfig *keyconf);
-int paint_stroke_modal(struct bContext *C, struct wmOperator *op, struct wmEvent *event);
+int paint_stroke_modal(struct bContext *C, struct wmOperator *op, const struct wmEvent *event);
 int paint_stroke_exec(struct bContext *C, struct wmOperator *op);
 int paint_stroke_cancel(struct bContext *C, struct wmOperator *op);
 struct ViewContext *paint_stroke_view_context(struct PaintStroke *stroke);

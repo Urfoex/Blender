@@ -751,7 +751,7 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
     def poll(cls, context):
         settings = cls.paint_settings(context)
         return (settings and settings.brush and
-                (context.sculpt_object or context.image_paint_object))
+                (context.sculpt_object or context.image_paint_object or context.vertex_paint_object))
 
     def draw(self, context):
         layout = self.layout
@@ -766,19 +766,18 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
 
         brush_texture_settings(col, brush, context.sculpt_object)
 
-        if context.sculpt_object:
-            # use_texture_overlay and texture_overlay_alpha
-            col = layout.column(align=True)
-            col.active = brush.sculpt_capabilities.has_overlay
-            col.label(text="Overlay:")
+        # use_texture_overlay and texture_overlay_alpha
+        col = layout.column(align=True)
+        col.active = brush.brush_capabilities.has_overlay
+        col.label(text="Overlay:")
 
-            row = col.row()
-            if brush.use_texture_overlay:
-                row.prop(brush, "use_texture_overlay", toggle=True, text="", icon='RESTRICT_VIEW_OFF')
-            else:
-                row.prop(brush, "use_texture_overlay", toggle=True, text="", icon='RESTRICT_VIEW_ON')
-            sub = row.row()
-            sub.prop(brush, "texture_overlay_alpha", text="Alpha")
+        row = col.row()
+        if brush.use_texture_overlay:
+            row.prop(brush, "use_texture_overlay", toggle=True, text="", icon='RESTRICT_VIEW_OFF')
+        else:
+            row.prop(brush, "use_texture_overlay", toggle=True, text="", icon='RESTRICT_VIEW_ON')
+        sub = row.row()
+        sub.prop(brush, "texture_overlay_alpha", text="Alpha")
 
 
 class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
@@ -855,18 +854,17 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
 
             col.separator()
 
-            if not image_paint:
-                col.prop(brush, "use_smooth_stroke")
+            col.prop(brush, "use_smooth_stroke")
 
-                col = layout.column()
-                col.active = brush.use_smooth_stroke
-                col.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
-                col.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
+            col = layout.column()
+            col.active = brush.use_smooth_stroke
+            col.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
+            col.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
 
             col.separator()
 
             col = layout.column()
-            col.active = brush.sculpt_capabilities.has_spacing
+            col.active = brush.brush_capabilities.has_spacing
             col.prop(brush, "use_space")
 
             row = col.row(align=True)
@@ -1143,13 +1141,15 @@ class VIEW3D_PT_tools_projectpaint(View3DPanel, Panel):
         ipaint = toolsettings.image_paint
         settings = toolsettings.image_paint
 
+        layout.prop(ipaint, "input_samples")
+
         col = layout.column()
         col.prop(ipaint, "use_occlude")
         col.prop(ipaint, "use_backface_culling")
 
         row = layout.row()
         row.prop(ipaint, "use_normal_falloff")
-
+ 
         sub = row.row()
         sub.active = (ipaint.use_normal_falloff)
         sub.prop(ipaint, "normal_angle", text="")
@@ -1183,7 +1183,7 @@ class VIEW3D_PT_tools_projectpaint(View3DPanel, Panel):
 
         col.operator("paint.project_image", text="Apply Camera Image")
         col.operator("image.save_dirty", text="Save All Edited")
-
+        
 
 class VIEW3D_PT_imagepaint_options(View3DPaintPanel):
     bl_label = "Options"

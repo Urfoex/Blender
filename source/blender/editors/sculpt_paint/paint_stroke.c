@@ -123,7 +123,7 @@ static void paint_draw_smooth_stroke(bContext *C, int x, int y, void *customdata
 
 /* if this is a tablet event, return tablet pressure and set *pen_flip
  * to 1 if the eraser tool is being used, 0 otherwise */
-static float event_tablet_data(wmEvent *event, int *pen_flip)
+static float event_tablet_data(const wmEvent *event, int *pen_flip)
 {
 	int erasor = 0;
 	float pressure = 1;
@@ -235,7 +235,7 @@ static void paint_brush_update(bContext *C, Brush *brush, PaintMode mode,
 #endif
 
 /* Put the location of the next stroke dot into the stroke RNA and apply it to the mesh */
-static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, wmEvent *event, const float mouse_in[2])
+static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, const wmEvent *event, const float mouse_in[2])
 {
 	Scene *scene = CTX_data_scene(C);
 	Paint *paint = paint_get_active_from_context(C);
@@ -312,20 +312,12 @@ static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, wmEvent *ev
 
 /* Returns zero if no sculpt changes should be made, non-zero otherwise */
 static int paint_smooth_stroke(PaintStroke *stroke, float output[2],
-                               const PaintSample *sample)
+                               const PaintSample *sample, PaintMode mode)
 {
 	output[0] = sample->mouse[0];
 	output[1] = sample->mouse[1];
 
-	if ((stroke->brush->flag & BRUSH_SMOOTH_STROKE) &&  
-	    !ELEM4(stroke->brush->sculpt_tool,
-	           SCULPT_TOOL_GRAB,
-	           SCULPT_TOOL_THUMB,
-	           SCULPT_TOOL_ROTATE,
-	           SCULPT_TOOL_SNAKE_HOOK) &&
-	    !(stroke->brush->flag & BRUSH_ANCHORED) &&
-	    !(stroke->brush->flag & BRUSH_RESTORE_MESH))
-	{
+	if (paint_supports_smooth_stroke(stroke->brush, mode)) {
 		float u = stroke->brush->smooth_stroke_factor, v = 1.0f - u;
 		float dx = stroke->last_mouse_position[0] - sample->mouse[0];
 		float dy = stroke->last_mouse_position[1] - sample->mouse[1];
@@ -344,7 +336,7 @@ static int paint_smooth_stroke(PaintStroke *stroke, float output[2],
 
 /* For brushes with stroke spacing enabled, moves mouse in steps
  * towards the final mouse location. */
-static int paint_space_stroke(bContext *C, wmOperator *op, wmEvent *event, const float final_mouse[2])
+static int paint_space_stroke(bContext *C, wmOperator *op, const wmEvent *event, const float final_mouse[2])
 {
 	PaintStroke *stroke = op->customdata;
 	PaintMode mode = paintmode_get_active_from_context(C);
@@ -470,16 +462,47 @@ bool paint_supports_dynamic_size(Brush *br, PaintMode mode)
 
 	switch (mode) {
 		case PAINT_SCULPT:
-			if (ELEM4(br->sculpt_tool, SCULPT_TOOL_GRAB, SCULPT_TOOL_THUMB, SCULPT_TOOL_ROTATE, SCULPT_TOOL_SNAKE_HOOK))
-			return false;
+			if (ELEM4(br->sculpt_tool,
+			          SCULPT_TOOL_GRAB,
+			          SCULPT_TOOL_THUMB,
+			          SCULPT_TOOL_ROTATE,
+			          SCULPT_TOOL_SNAKE_HOOK))
+			{
+				return false;
+			}
 		default:
 			;
-		}
+	}
+	return true;
+}
+
+bool paint_supports_smooth_stroke(Brush *br, PaintMode mode)
+{
+	if(!(br->flag & BRUSH_SMOOTH_STROKE) ||
+	    (br->flag & BRUSH_ANCHORED) ||
+	    (br->flag & BRUSH_RESTORE_MESH))
+	{
+		return false;
+	}
+
+	switch (mode) {
+		case PAINT_SCULPT:
+			if (ELEM4(br->sculpt_tool,
+			          SCULPT_TOOL_GRAB,
+			          SCULPT_TOOL_THUMB,
+			          SCULPT_TOOL_ROTATE,
+			          SCULPT_TOOL_SNAKE_HOOK))
+			{
+				return false;
+			}
+		default:
+			;
+	}
 	return true;
 }
 
 /* return true if the brush size can change during paint (normally used for pressure) */
-bool paint_supports_moving_texture(Brush *br, PaintMode mode)
+bool paint_supports_dynamic_tex_coords(Brush *br, PaintMode mode)
 {
 	if (br->flag & BRUSH_ANCHORED)
 		return false;
@@ -563,7 +586,7 @@ static void paint_stroke_sample_average(const PaintStroke *stroke,
 	/*printf("avg=(%f, %f), num=%d\n", average->mouse[0], average->mouse[1], stroke->num_samples);*/
 }
 
-int paint_stroke_modal(bContext *C, wmOperator *op, wmEvent *event)
+int paint_stroke_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Paint *p = paint_get_active_from_context(C);
 	PaintMode mode = paintmode_get_active_from_context(C);
@@ -616,7 +639,7 @@ int paint_stroke_modal(bContext *C, wmOperator *op, wmEvent *event)
 	         (event->type == TIMER && (event->customdata == stroke->timer)) )
 	{
 		if (stroke->stroke_started) {
-			if (paint_smooth_stroke(stroke, mouse, &sample_average)) {
+			if (paint_smooth_stroke(stroke, mouse, &sample_average, mode)) {
 				if (paint_space_stroke_enabled(stroke->brush, mode)) {
 					if (!paint_space_stroke(C, op, event, mouse)) {
 						//ED_region_tag_redraw(ar);
