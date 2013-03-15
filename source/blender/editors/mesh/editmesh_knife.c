@@ -137,7 +137,8 @@ typedef struct KnifePosData {
 typedef struct KnifeTool_OpData {
 	ARegion *ar;        /* region that knifetool was activated in */
 	void *draw_handle;  /* for drawing preview loop */
-	ViewContext vc;
+	ViewContext vc;     /* note: _don't_ use 'mval', instead use the one we define below */
+	float mval[2];      /* mouse value with snapping applied */
 	//bContext *C;
 
 	Object *ob;
@@ -233,9 +234,9 @@ BLI_INLINE int round_ftoi(float x)
 	return x > 0.0f ?  (int)(x + 0.5f) : (int)(x - 0.5f);
 }
 
-static void knife_project_v3(KnifeTool_OpData *kcd, const float co[3], float sco[3])
+static void knife_project_v3(const KnifeTool_OpData *kcd, const float co[3], float sco[3])
 {
-	ED_view3d_project_float_v3_m4(kcd->ar, co, sco, kcd->projmat);
+	ED_view3d_project_float_v3_m4(kcd->ar, co, sco, (float (*)[4])kcd->projmat);
 }
 
 static void knife_pos_data_clear(KnifePosData *kpd)
@@ -245,8 +246,7 @@ static void knife_pos_data_clear(KnifePosData *kpd)
 	kpd->vert = NULL;
 	kpd->edge = NULL;
 	kpd->bmface = NULL;
-	kpd->mval[0] = 0.0f;
-	kpd->mval[1] = 0.0f;
+	zero_v2(kpd->mval);
 }
 
 static ListBase *knife_empty_list(KnifeTool_OpData *kcd)
@@ -890,7 +890,7 @@ static void knife_finish_cut(KnifeTool_OpData *UNUSED(kcd))
 
 }
 
-static void knifetool_draw_angle_snapping(KnifeTool_OpData *kcd)
+static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
 {
 	bglMats mats;
 	double u[3], u1[2], u2[2], v1[3], v2[3], dx, dy;
@@ -1006,7 +1006,7 @@ static void knife_init_colors(KnifeColors *colors)
 static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 {
 	View3D *v3d = CTX_wm_view3d(C);
-	KnifeTool_OpData *kcd = arg;
+	const KnifeTool_OpData *kcd = arg;
 
 	if (v3d->zbuf) glDisable(GL_DEPTH_TEST);
 
@@ -1747,7 +1747,7 @@ static KnifeVert *knife_find_closest_vert(KnifeTool_OpData *kcd, float p[3], flo
 	return NULL;
 }
 
-/* update both kcd->curr.mval and kcd->vc.mval to snap to required angle */
+/* update both kcd->curr.mval and kcd->mval to snap to required angle */
 static void knife_snap_angle(KnifeTool_OpData *kcd)
 {
 	float dx, dy;
@@ -1784,16 +1784,14 @@ static void knife_snap_angle(KnifeTool_OpData *kcd)
 		kcd->curr.mval[0] = kcd->prev.mval[0];
 	}
 
-	kcd->vc.mval[0] = round_ftoi(kcd->curr.mval[0]);
-	kcd->vc.mval[1] = round_ftoi(kcd->curr.mval[1]);
+	copy_v2_v2(kcd->mval, kcd->curr.mval);
 }
 
 /* update active knife edge/vert pointers */
 static int knife_update_active(KnifeTool_OpData *kcd)
 {
 	knife_pos_data_clear(&kcd->curr);
-	kcd->curr.mval[0] = (float)kcd->vc.mval[0];
-	kcd->curr.mval[1] = (float)kcd->vc.mval[1];
+	copy_v2_v2(kcd->curr.mval, kcd->mval);
 	if (kcd->angle_snapping != ANGLE_FREE && kcd->mode == MODE_DRAGGING)
 		knife_snap_angle(kcd);
 
@@ -2853,10 +2851,8 @@ static void knife_make_cuts(KnifeTool_OpData *kcd)
 #endif
 
 /* called on tool confirmation */
-static void knifetool_finish(wmOperator *op)
+static void knifetool_finish_ex(KnifeTool_OpData *kcd)
 {
-	KnifeTool_OpData *kcd = op->customdata;
-
 #if SCANFILL_CUTS
 	knifenet_fill_faces(kcd);
 #else
@@ -2865,6 +2861,11 @@ static void knifetool_finish(wmOperator *op)
 
 	EDBM_mesh_normals_update(kcd->em);
 	EDBM_update_generic(kcd->em, TRUE, TRUE);
+}
+static void knifetool_finish(wmOperator *op)
+{
+	KnifeTool_OpData *kcd = op->customdata;
+	knifetool_finish_ex(kcd);
 }
 
 static void knife_recalc_projmat(KnifeTool_OpData *kcd)
@@ -2878,10 +2879,8 @@ static void knife_recalc_projmat(KnifeTool_OpData *kcd)
 }
 
 /* called when modal loop selection is done... */
-static void knifetool_exit(bContext *C, wmOperator *op)
+static void knifetool_exit_ex(bContext *C, KnifeTool_OpData *kcd)
 {
-	KnifeTool_OpData *kcd = op->customdata;
-
 	if (!kcd)
 		return;
 
@@ -2913,6 +2912,11 @@ static void knifetool_exit(bContext *C, wmOperator *op)
 
 	/* destroy kcd itself */
 	MEM_freeN(kcd);
+}
+static void knifetool_exit(bContext *C, wmOperator *op)
+{
+	KnifeTool_OpData *kcd = op->customdata;
+	knifetool_exit_ex(C, kcd);
 	op->customdata = NULL;
 }
 
@@ -2930,15 +2934,20 @@ static void cage_mapped_verts_callback(void *userData, int index, const float co
 	}
 }
 
-static void knifetool_update_mval(KnifeTool_OpData *kcd, const int mval_i[2])
+static void knifetool_update_mval(KnifeTool_OpData *kcd, const float mval[2])
 {
 	knife_recalc_projmat(kcd);
-	kcd->vc.mval[0] = mval_i[0];
-	kcd->vc.mval[1] = mval_i[1];
+	copy_v2_v2(kcd->mval, mval);
 
 	if (knife_update_active(kcd)) {
 		ED_region_tag_redraw(kcd->ar);
 	}
+}
+
+static void knifetool_update_mval_i(KnifeTool_OpData *kcd, const int mval_i[2])
+{
+	float mval[2] = {UNPACK2(mval_i)};
+	knifetool_update_mval(kcd, mval);
 }
 
 /* called when modal loop selection gets set up... */
@@ -3032,8 +3041,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 	WM_cursor_modal(CTX_wm_window(C), BC_KNIFECURSOR);
 	WM_event_add_modal_handler(C, op);
 
-	kcd = op->customdata;
-	knifetool_update_mval(kcd, event->mval);
+	knifetool_update_mval_i(kcd, event->mval);
 
 	knife_update_header(C, kcd);
 
@@ -3226,7 +3234,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 			case MOUSEMOVE: /* mouse moved somewhere to select another loop */
 				if (kcd->mode != MODE_PANNING) {
-					knifetool_update_mval(kcd, event->mval);
+					knifetool_update_mval_i(kcd, event->mval);
 				}
 
 				break;
@@ -3236,7 +3244,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	if (do_refresh) {
 		/* we don't really need to update mval,
 		 * but this happens to be the best way to refresh at the moment */
-		knifetool_update_mval(kcd, event->mval);
+		knifetool_update_mval_i(kcd, event->mval);
 	}
 
 	/* keep going until the user confirms */
