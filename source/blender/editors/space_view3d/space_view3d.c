@@ -48,10 +48,12 @@
 #include "BKE_object.h"
 #include "BKE_screen.h"
 
+#include "ED_render.h"
 #include "ED_space_api.h"
 #include "ED_screen.h"
 #include "ED_object.h"
 
+#include "GPU_extensions.h"
 #include "GPU_material.h"
 
 #include "BIF_gl.h"
@@ -350,7 +352,7 @@ static void view3d_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void view3d_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
+static void view3d_init(wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
 {
 
 }
@@ -467,6 +469,21 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 	
 	WM_event_add_dropbox_handler(&ar->handlers, lb);
 	
+}
+
+static void view3d_main_area_exit(wmWindowManager *UNUSED(wm), ARegion *ar)
+{
+	RegionView3D *rv3d = ar->regiondata;
+
+	if (rv3d->render_engine) {
+		RE_engine_free(rv3d->render_engine);
+		rv3d->render_engine = NULL;
+	}
+
+	if (rv3d->gpuoffscreen) {
+		GPU_offscreen_free(rv3d->gpuoffscreen);
+		rv3d->gpuoffscreen = NULL;
+	}
 }
 
 static int view3d_ob_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent *UNUSED(event))
@@ -615,6 +632,10 @@ static void view3d_main_area_free(ARegion *ar)
 		if (rv3d->sms) {
 			MEM_freeN(rv3d->sms);
 		}
+		if (rv3d->gpuoffscreen) {
+			GPU_offscreen_free(rv3d->gpuoffscreen);
+		}
+
 		MEM_freeN(rv3d);
 		ar->regiondata = NULL;
 	}
@@ -633,6 +654,7 @@ static void *view3d_main_area_duplicate(void *poin)
 			new->clipbb = MEM_dupallocN(rv3d->clipbb);
 		
 		new->depths = NULL;
+		new->gpuoffscreen = NULL;
 		new->ri = NULL;
 		new->render_engine = NULL;
 		new->gpd = NULL;
@@ -1216,6 +1238,7 @@ void ED_spacetype_view3d(void)
 	art->keymapflag = ED_KEYMAP_GPENCIL;
 	art->draw = view3d_main_area_draw;
 	art->init = view3d_main_area_init;
+	art->exit = view3d_main_area_exit;
 	art->free = view3d_main_area_free;
 	art->duplicate = view3d_main_area_duplicate;
 	art->listener = view3d_main_area_listener;

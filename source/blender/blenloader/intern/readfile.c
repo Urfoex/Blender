@@ -5917,6 +5917,7 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 			rv3d->clipbb = newdataadr(fd, rv3d->clipbb);
 			
 			rv3d->depths = NULL;
+			rv3d->gpuoffscreen = NULL;
 			rv3d->ri = NULL;
 			rv3d->render_engine = NULL;
 			rv3d->sms = NULL;
@@ -6082,7 +6083,7 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 					soops->treestore->totelem = soops->treestore->usedelem;
 					soops->storeflag |= SO_TREESTORE_CLEANUP;	// at first draw
 				}
-				 soops->tree.first = soops->tree.last= NULL;
+				soops->tree.first = soops->tree.last= NULL;
 			}
 			else if (sl->spacetype == SPACE_IMAGE) {
 				SpaceImage *sima = (SpaceImage *)sl;
@@ -10412,7 +10413,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 						PackedFile *pf = mainptr->curlib->packedfile;
 						
 						BKE_reportf_wrap(basefd->reports, RPT_INFO, TIP_("Read packed library:  '%s'"),
-										 mainptr->curlib->name);
+						                 mainptr->curlib->name);
 						fd = blo_openblendermemory(pf->data, pf->size, basefd->reports);
 						
 						
@@ -10421,7 +10422,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					}
 					else {
 						BKE_reportf_wrap(basefd->reports, RPT_INFO, TIP_("Read library:  '%s', '%s'"),
-										 mainptr->curlib->filepath, mainptr->curlib->name);
+						                 mainptr->curlib->filepath, mainptr->curlib->name);
 						fd = blo_openblenderfile(mainptr->curlib->filepath, basefd->reports);
 					}
 					/* allow typing in a new lib path */
