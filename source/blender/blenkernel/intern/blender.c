@@ -461,7 +461,7 @@ int BKE_read_file(bContext *C, const char *filepath, ReportList *reports)
 	return (bfd ? retval : BKE_READ_FILE_FAIL);
 }
 
-int BKE_read_file_from_memory(bContext *C, char *filebuf, int filelength, ReportList *reports)
+int BKE_read_file_from_memory(bContext *C, const void *filebuf, int filelength, ReportList *reports)
 {
 	BlendFileData *bfd;
 
@@ -899,12 +899,14 @@ static void copybuffer_doit(void *UNUSED(handle), Main *UNUSED(bmain), void *vid
 {
 	if (vid) {
 		ID *id = vid;
-		id->flag |= LIB_NEED_EXPAND | LIB_DOIT;
+		/* only tag for need-expand if not done, prevents eternal loops */
+		if ((id->flag & LIB_DOIT) == 0)
+			id->flag |= LIB_NEED_EXPAND | LIB_DOIT;
 	}
 }
 
 /* frees main in end */
-int BKE_copybuffer_save(char *filename, ReportList *reports)
+int BKE_copybuffer_save(const char *filename, ReportList *reports)
 {
 	Main *mainb = MEM_callocN(sizeof(Main), "copybuffer");
 	ListBase *lbarray[MAX_LIBARRAY], *fromarray[MAX_LIBARRAY];
@@ -957,7 +959,7 @@ int BKE_copybuffer_save(char *filename, ReportList *reports)
 }
 
 /* return success (1) */
-int BKE_copybuffer_paste(bContext *C, char *libname, ReportList *reports)
+int BKE_copybuffer_paste(bContext *C, const char *libname, ReportList *reports)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
@@ -993,7 +995,7 @@ int BKE_copybuffer_paste(bContext *C, char *libname, ReportList *reports)
 	
 	/* append, rather than linking */
 	lib = BLI_findstring(&bmain->library, libname, offsetof(Library, filepath));
-	BKE_library_make_local(bmain, lib, 1);
+	BKE_library_make_local(bmain, lib, true);
 	
 	/* important we unset, otherwise these object wont
 	 * link into other scenes from this blend file */

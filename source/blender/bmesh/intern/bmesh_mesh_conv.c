@@ -628,7 +628,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
 	/* this is called again, 'dotess' arg is used there */
-	mesh_update_customdata_pointers(me, 0);
+	BKE_mesh_update_customdata_pointers(me, 0);
 
 	i = 0;
 	BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
@@ -750,7 +750,9 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 									hmd->indexar[j++] = BM_elem_index_get(eve);
 								}
 							}
-							else j++;
+							else {
+								j++;
+							}
 						}
 
 						hmd->totindex = j;
@@ -766,7 +768,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		BKE_mesh_tessface_calc(me);
 	}
 
-	mesh_update_customdata_pointers(me, do_tessface);
+	BKE_mesh_update_customdata_pointers(me, do_tessface);
 
 	{
 		BMEditSelection *selected;

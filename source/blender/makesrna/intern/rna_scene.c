@@ -26,11 +26,6 @@
 
 #include <stdlib.h>
 
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
-
 #include "DNA_brush_types.h"
 #include "DNA_group_types.h"
 #include "DNA_modifier_types.h"
@@ -45,6 +40,11 @@
 #include "BLF_translation.h"
 
 #include "BKE_tessmesh.h"
+
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "rna_internal.h"
 
 /* Include for Bake Options */
 #include "RE_engine.h"
@@ -1173,13 +1173,12 @@ static void rna_SceneRenderLayer_pass_update(Main *bmain, Scene *activescene, Po
 	rna_Scene_glsl_update(bmain, activescene, ptr);
 }
 
-static void rna_Scene_use_nodes_set(PointerRNA *ptr, int value)
+static void rna_Scene_use_nodes_update(bContext *C, PointerRNA *ptr)
 {
 	Scene *scene = (Scene *)ptr->data;
 
-	scene->use_nodes = value;
 	if (scene->use_nodes && scene->nodetree == NULL)
-		ED_node_composit_default(scene);
+		ED_node_composit_default(C, scene);
 }
 
 static void rna_Physics_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
@@ -2633,7 +2632,7 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "fps", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "ticrate");
 	RNA_def_property_ui_range(prop, 1, 60, 1, 1);
-	RNA_def_property_range(prop, 1, 250);
+	RNA_def_property_range(prop, 1, 10000);
 	RNA_def_property_ui_text(prop, "Frames Per Second",
 	                         "Nominal number of game frames per second "
 	                         "(physics fixed timestep = 1/fps, independently of actual frame rate)");
@@ -3089,8 +3088,9 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
 		{CODEC_ID_THEORA, "THEORA", 0, "Theora", ""},
 		{CODEC_ID_FLV1, "FLASH", 0, "Flash Video", ""},
 		{CODEC_ID_FFV1, "FFV1", 0, "FFmpeg video codec #1", ""},
-		{CODEC_ID_QTRLE, "QTRLE", 0, "QTRLE", ""},
+		{CODEC_ID_QTRLE, "QTRLE", 0, "QT rle / QT Animation", ""},
 		{CODEC_ID_DNXHD, "DNXHD", 0, "DNxHD", ""},
+		{CODEC_ID_PNG, "PNG", 0, "PNG", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -4532,9 +4532,9 @@ void RNA_def_scene(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_nodes", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_nodes", 1);
-	RNA_def_property_boolean_funcs(prop, NULL, "rna_Scene_use_nodes_set");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_ui_text(prop, "Use Nodes", "Enable the compositing node tree");
-	RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
+	RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Scene_use_nodes_update");
 	
 	/* Sequencer */
 	prop = RNA_def_property(srna, "sequence_editor", PROP_POINTER, PROP_NONE);

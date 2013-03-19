@@ -57,7 +57,6 @@ GeometryExporter::GeometryExporter(COLLADASW::StreamWriter *sw, const ExportSett
 {
 }
 
-
 void GeometryExporter::exportGeom(Scene *sce)
 {
 	openLibrary();
@@ -77,19 +76,15 @@ void GeometryExporter::operator()(Object *ob)
 #endif
 
 	bool use_instantiation = this->export_settings->use_object_instantiation;
-	bool use_ngons         = this->export_settings->use_ngons;
-	Mesh *me;
-	if (this->export_settings->apply_modifiers) {
-		me = bc_to_mesh_apply_modifiers(mScene, ob, this->export_settings->export_mesh_type);
-	}
-	else {
-		me = (Mesh *)ob->data;
-	}
-	BKE_mesh_tessface_ensure(me);
+	Mesh *me = bc_get_mesh_copy( mScene, 
+					ob,
+					this->export_settings->export_mesh_type,
+					this->export_settings->apply_modifiers,
+					this->export_settings->triangulate);
 
 	std::string geom_id = get_geometry_id(ob, use_instantiation);
 	std::vector<Normal> nor;
-	std::vector<Face> norind;
+	std::vector<BCPolygonNormalsIndices> norind;
 
 	// Skip if linked geometry was already exported from another reference
 	if (use_instantiation && 
@@ -118,12 +113,13 @@ void GeometryExporter::operator()(Object *ob)
 	bool has_uvs = (bool)CustomData_has_layer(&me->fdata, CD_MTFACE);
 	
 	// writes <source> for uv coords if mesh has uv coords
-	if (has_uvs)
+	if (has_uvs) {
 		createTexcoordsSource(geom_id, me);
+	}
 
-	if (has_color)
+	if (has_color) {
 		createVertexColorSource(geom_id, me);
-
+	}
 	// <vertices>
 
 	COLLADASW::Vertices verts(mSW);
@@ -133,18 +129,18 @@ void GeometryExporter::operator()(Object *ob)
 	input_list.push_back(input);
 	verts.add();
 
-	createLooseEdgeList(ob, me, geom_id, norind);
+	createLooseEdgeList(ob, me, geom_id);
 
 	// Only create Polylists if number of faces > 0
 	if (me->totface > 0) {
 		// XXX slow
 		if (ob->totcol) {
 			for (int a = 0; a < ob->totcol; a++) {
-				createPolylist(a, use_ngons, has_uvs, has_color, ob, me, geom_id, norind);
+				createPolylist(a, has_uvs, has_color, ob, me, geom_id, norind);
 			}
 		}
 		else {
-			createPolylist(0, use_ngons, has_uvs, has_color, ob, me, geom_id, norind);
+			createPolylist(0, has_uvs, has_color, ob, me, geom_id, norind);
 		}
 	}
 	
@@ -156,32 +152,28 @@ void GeometryExporter::operator()(Object *ob)
 
 	closeGeometry();
 
-	if (this->export_settings->apply_modifiers) {
-		BKE_libblock_free_us(&(G.main->mesh), me);
-	}
-
 	if (this->export_settings->include_shapekeys) {
 		Key * key = BKE_key_from_object(ob);
 		if (key) {
-			KeyBlock * kb = (KeyBlock*)key->block.first;
+			KeyBlock * kb = (KeyBlock *)key->block.first;
 			//skip the basis
 			kb = kb->next;
 			for (; kb; kb = kb->next) {
 				BKE_key_convert_to_mesh(kb, me);
-				export_key_mesh(ob, me, kb, use_ngons);
+				export_key_mesh(ob, me, kb);
 			}
 		}
 	}
-#if 0
-	dm->release(dm);
-#endif
+
+	BKE_libblock_free_us(&(G.main->mesh), me);
+
 }
 
-void GeometryExporter::export_key_mesh(Object *ob, Mesh *me, KeyBlock *kb, bool use_ngons)
+void GeometryExporter::export_key_mesh(Object *ob, Mesh *me, KeyBlock *kb)
 {
 	std::string geom_id = get_geometry_id(ob, false) + "_morph_" + translate_id(kb->name);
 	std::vector<Normal> nor;
-	std::vector<Face> norind;
+	std::vector<BCPolygonNormalsIndices> norind;
 	
 	if (exportedGeometry.find(geom_id) != exportedGeometry.end())
 	{
@@ -208,11 +200,13 @@ void GeometryExporter::export_key_mesh(Object *ob, Mesh *me, KeyBlock *kb, bool 
 	bool has_uvs = (bool)CustomData_has_layer(&me->fdata, CD_MTFACE);
 	
 	// writes <source> for uv coords if mesh has uv coords
-	if (has_uvs)
+	if (has_uvs) {
 		createTexcoordsSource(geom_id, me);
+	}
 
-	if (has_color)
+	if (has_color) {
 		createVertexColorSource(geom_id, me);
+	}
 
 	// <vertices>
 
@@ -228,11 +222,11 @@ void GeometryExporter::export_key_mesh(Object *ob, Mesh *me, KeyBlock *kb, bool 
 	// XXX slow		
 	if (ob->totcol) {
 		for (int a = 0; a < ob->totcol; a++) {
-			createPolylist(a, use_ngons, has_uvs, has_color, ob, me, geom_id, norind);
+			createPolylist(a, has_uvs, has_color, ob, me, geom_id, norind);
 		}
 	}
 	else {
-		createPolylist(0, use_ngons, has_uvs, has_color, ob, me, geom_id, norind);
+		createPolylist(0, has_uvs, has_color, ob, me, geom_id, norind);
 	}
 	
 	closeMesh();
@@ -246,8 +240,7 @@ void GeometryExporter::export_key_mesh(Object *ob, Mesh *me, KeyBlock *kb, bool 
 
 void GeometryExporter::createLooseEdgeList(Object *ob,
                                            Mesh   *me,
-                                           std::string& geom_id,
-                                           std::vector<Face>& norind)
+                                           std::string& geom_id)
 {
 
 	MEdge *medges = me->medge;
@@ -297,28 +290,14 @@ void GeometryExporter::createLooseEdgeList(Object *ob,
 }
 
 // powerful because it handles both cases when there is material and when there's not
-// Call this function when ngons shall be exported unchanged
 void GeometryExporter::createPolylist(short material_index,
-									  bool use_ngons,
                                       bool has_uvs,
                                       bool has_color,
                                       Object *ob,
                                       Mesh *me,
                                       std::string& geom_id,
-                                      std::vector<Face>& norind)
+                                      std::vector<BCPolygonNormalsIndices>& norind)
 {
-
-	if (!use_ngons) {
-		createTriangulatedPolylist(
-				material_index,
-				has_uvs,
-				has_color,
-				ob,
-				me,
-				geom_id,
-				norind);
-		return;
-	}
 
 	MPoly *mpolys = me->mpoly;
 	MLoop *mloops = me->mloop;
@@ -399,19 +378,17 @@ void GeometryExporter::createPolylist(short material_index,
 	
 	// <p>
 	int texindex = 0;
-	unsigned int vi = 0;
-	unsigned int ni = 0;
 	for (i = 0; i < totpolys; i++) {
 		MPoly *p = &mpolys[i];
 		int loop_count = p->totloop;
 
 		if (p->mat_nr == material_index) {
 			MLoop *l = &mloops[p->loopstart];
-			unsigned int *n = &norind[i].v1;
+			BCPolygonNormalsIndices normal_indices = norind[i];
 
 			for (int j = 0; j < loop_count; j++) {
 				polylist.appendValues(l[j].v);
-				polylist.appendValues(n[j]);
+				polylist.appendValues(normal_indices[j]);
 				if (has_uvs)
 					polylist.appendValues(texindex + j);
 
@@ -426,127 +403,6 @@ void GeometryExporter::createPolylist(short material_index,
 	polylist.finish();
 }
 
-// powerful because it handles both cases when there is material and when there's not
-// Call this function when ngons shall be exported as Tris or Quads
-void GeometryExporter::createTriangulatedPolylist(short material_index,
-                                      bool has_uvs,
-                                      bool has_color,
-                                      Object *ob,
-                                      Mesh *me,
-                                      std::string& geom_id,
-                                      std::vector<Face>& norind)
-{
-	MFace *mfaces = me->mface;
-	int totfaces = me->totface;
-
-	// <vcount>
-	int i;
-	int faces_in_polylist = 0;
-	std::vector<unsigned long> vcount_list;
-
-	// count faces with this material
-	for (i = 0; i < totfaces; i++) {
-		MFace *f = &mfaces[i];
-		
-		if (f->mat_nr == material_index) {
-			faces_in_polylist++;
-			if (f->v4 == 0) {
-				vcount_list.push_back(3);
-			}
-			else {
-				vcount_list.push_back(4);
-			}
-		}
-	}
-
-	// no faces using this material
-	if (faces_in_polylist == 0) {
-		fprintf(stderr, "%s: material with index %d is not used.\n", id_name(ob).c_str(), material_index);
-		return;
-	}
-		
-	Material *ma = ob->totcol ? give_current_material(ob, material_index + 1) : NULL;
-	COLLADASW::Polylist polylist(mSW);
-		
-	// sets count attribute in <polylist>
-	polylist.setCount(faces_in_polylist);
-		
-	// sets material name
-	if (ma) {
-		std::string material_id = get_material_id(ma);
-		std::ostringstream ostr;
-		ostr << translate_id(material_id);
-		polylist.setMaterial(ostr.str());
-	}
-			
-	COLLADASW::InputList &til = polylist.getInputList();
-		
-	// creates <input> in <polylist> for vertices 
-	COLLADASW::Input input1(COLLADASW::InputSemantic::VERTEX, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::VERTEX), 0);
-		
-	// creates <input> in <polylist> for normals
-	COLLADASW::Input input2(COLLADASW::InputSemantic::NORMAL, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::NORMAL), 1);
-		
-	til.push_back(input1);
-	til.push_back(input2);
-		
-	// if mesh has uv coords writes <input> for TEXCOORD
-	int num_layers = CustomData_number_of_layers(&me->fdata, CD_MTFACE);
-	int active_uv_index = CustomData_get_active_layer_index(&me->fdata, CD_MTFACE)-1;
-	for (i = 0; i < num_layers; i++) {
-		if (!this->export_settings->active_uv_only || i == active_uv_index) {
-
-			// char *name = CustomData_get_layer_name(&me->fdata, CD_MTFACE, i);
-			COLLADASW::Input input3(COLLADASW::InputSemantic::TEXCOORD,
-									makeUrl(makeTexcoordSourceId(geom_id, i)),
-									2, // offset always 2, this is only until we have optimized UV sets
-									i  // set number equals UV map index
-									);
-			til.push_back(input3);
-		}
-	}
-
-	if (has_color) {
-		COLLADASW::Input input4(COLLADASW::InputSemantic::COLOR, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::COLOR), has_uvs ? 3 : 2);
-		til.push_back(input4);
-	}
-		
-	// sets <vcount>
-	polylist.setVCountList(vcount_list);
-		
-	// performs the actual writing
-	polylist.prepareToAppendValues();
-	
-
-		
-	// <p>
-	int texindex = 0;
-	for (i = 0; i < totfaces; i++) {
-		MFace *f = &mfaces[i];
-
-		if (f->mat_nr == material_index) {
-
-			unsigned int *v = &f->v1;
-			unsigned int *n = &norind[i].v1;
-			for (int j = 0; j < (f->v4 == 0 ? 3 : 4); j++) {
-				polylist.appendValues(v[j]);
-				polylist.appendValues(n[j]);
-
-				if (has_uvs)
-					polylist.appendValues(texindex + j);
-
-				if (has_color)
-					polylist.appendValues(texindex + j);
-			}
-		}
-
-		texindex += 3;
-		if (f->v4 != 0)
-			texindex++;
-	}
-		
-	polylist.finish();
-}
 
 // creates <source> for positions
 void GeometryExporter::createVertsSource(std::string geom_id, Mesh *me)
@@ -583,19 +439,14 @@ void GeometryExporter::createVertsSource(std::string geom_id, Mesh *me)
 
 void GeometryExporter::createVertexColorSource(std::string geom_id, Mesh *me)
 {
-	if (!CustomData_has_layer(&me->fdata, CD_MCOL))
+	if (!CustomData_has_layer(&me->ldata, CD_MLOOPCOL))
 		return;
 
-	MFace *f;
-	int totcolor = 0, i, j;
-
-	for (i = 0, f = me->mface; i < me->totface; i++, f++)
-		totcolor += f->v4 ? 4 : 3;
 
 	COLLADASW::FloatSourceF source(mSW);
 	source.setId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::COLOR));
 	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::COLOR) + ARRAY_ID_SUFFIX);
-	source.setAccessorCount(totcolor);
+	source.setAccessorCount(me->totloop);
 	source.setAccessorStride(3);
 
 	COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
@@ -605,17 +456,25 @@ void GeometryExporter::createVertexColorSource(std::string geom_id, Mesh *me)
 
 	source.prepareToAppendValues();
 
-	int index = CustomData_get_active_layer_index(&me->fdata, CD_MCOL);
+	int index = CustomData_get_active_layer_index(&me->ldata, CD_MLOOPCOL);
+	MCol *mcol = (MCol *)me->ldata.layers[index].data;
 
-	MCol *mcol = (MCol *)me->fdata.layers[index].data;
-	MCol *c = mcol;
-
-	for (i = 0, f = me->mface; i < me->totface; i++, c += 4, f++)
-		for (j = 0; j < (f->v4 ? 4 : 3); j++)
-			source.appendValues(c[j].b / 255.0f, c[j].g / 255.0f, c[j].r / 255.0f);
+	MPoly *mpoly;
+	int i;
+	for (i = 0, mpoly = me->mpoly; i < me->totpoly; i++, mpoly++) {
+		MCol *color = mcol + mpoly->loopstart;
+		for (int j = 0; j < mpoly->totloop; j++, color++) {
+			source.appendValues(
+					color->b / 255.0f,
+					color->g / 255.0f,
+					color->r / 255.0f 
+			);
+		}
+	}
 	
 	source.finish();
 }
+
 
 std::string GeometryExporter::makeTexcoordSourceId(std::string& geom_id, int layer_index)
 {
@@ -627,38 +486,21 @@ std::string GeometryExporter::makeTexcoordSourceId(std::string& geom_id, int lay
 //creates <source> for texcoords
 void GeometryExporter::createTexcoordsSource(std::string geom_id, Mesh *me)
 {
-#if 0
-	int totfaces = dm->getNumTessFaces(dm);
-	MFace *mfaces = dm->getTessFaceArray(dm);
-#endif
-	int totfaces = me->totface;
-	MFace *mfaces = me->mface;
 
-	int totuv = 0;
-	int i;
+	int totpoly   = me->totpoly;
+	int totuv     = me->totloop;
+	MPoly *mpolys = me->mpoly;
 
-	// count totuv
-	for (i = 0; i < totfaces; i++) {
-		MFace *f = &mfaces[i];
-		if (f->v4 == 0) {
-			totuv += 3;
-		}
-		else {
-			totuv += 4;
-		}
-	}
-
-	int num_layers = CustomData_number_of_layers(&me->fdata, CD_MTFACE);
+	int num_layers = CustomData_number_of_layers(&me->ldata, CD_MLOOPUV);
 
 	// write <source> for each layer
 	// each <source> will get id like meshName + "map-channel-1"
 	int map_index = 0;
-	int active_uv_index = CustomData_get_active_layer_index(&me->fdata, CD_MTFACE)-1;
+	int active_uv_index = CustomData_get_active_layer_index(&me->ldata, CD_MLOOPUV);
 	for (int a = 0; a < num_layers; a++) {
 
 		if (!this->export_settings->active_uv_only || a == active_uv_index) {
-			MTFace *tface = (MTFace *)CustomData_get_layer_n(&me->fdata, CD_MTFACE, a);
-			// char *name = CustomData_get_layer_name(&me->fdata, CD_MTFACE, a);
+			MLoopUV *mloops = (MLoopUV *)CustomData_get_layer_n(&me->ldata, CD_MLOOPUV, a);
 			
 			COLLADASW::FloatSourceF source(mSW);
 			std::string layer_id = makeTexcoordSourceId(geom_id, map_index++);
@@ -673,12 +515,12 @@ void GeometryExporter::createTexcoordsSource(std::string geom_id, Mesh *me)
 			
 			source.prepareToAppendValues();
 			
-			for (i = 0; i < totfaces; i++) {
-				MFace *f = &mfaces[i];
-				
-				for (int j = 0; j < (f->v4 == 0 ? 3 : 4); j++) {
-					source.appendValues(tface[i].uv[j][0],
-										tface[i].uv[j][1]);
+			for (int index = 0; index < totpoly; index++) {
+				MPoly   *mpoly = mpolys+index;
+				MLoopUV *mloop = mloops+mpoly->loopstart;
+				for (int j = 0; j < mpoly->totloop; j++) {
+					source.appendValues(mloop[j].uv[0],
+										mloop[j].uv[1]);
 				}
 			}
 			
@@ -718,53 +560,54 @@ void GeometryExporter::createNormalsSource(std::string geom_id, Mesh *me, std::v
 	source.finish();
 }
 
-void GeometryExporter::create_normals(std::vector<Normal> &nor, std::vector<Face> &ind, Mesh *me)
+void GeometryExporter::create_normals(std::vector<Normal> &normals, std::vector<BCPolygonNormalsIndices> &polygons_normals, Mesh *me)
 {
-	int i, j, v;
-	MVert *vert = me->mvert;
-	std::map<unsigned int, unsigned int> nshar;
+	std::map<unsigned int, unsigned int> shared_normal_indices;
+	int last_normal_index = -1;
 
-	for (i = 0; i < me->totface; i++) {
-		MFace *fa = &me->mface[i];
-		Face f;
-		unsigned int *nn = &f.v1;
-		unsigned int *vv = &fa->v1;
+	MVert *verts  = me->mvert;
+	MLoop *mloops = me->mloop;
+	for (int poly_index = 0; poly_index < me->totpoly; poly_index++) {
+		MPoly *mpoly  = &me->mpoly[poly_index];
 
-		memset(&f, 0, sizeof(f));
-		v = fa->v4 == 0 ? 3 : 4;
+		if (!(mpoly->flag & ME_SMOOTH)) {
+			// For flat faces use face normal as vertex normal:
 
-		if (!(fa->flag & ME_SMOOTH)) {
-			Normal n;
-			if (v == 4)
-				normal_quad_v3(&n.x, vert[fa->v1].co, vert[fa->v2].co, vert[fa->v3].co, vert[fa->v4].co);
-			else
-				normal_tri_v3(&n.x, vert[fa->v1].co, vert[fa->v2].co, vert[fa->v3].co);
-			nor.push_back(n);
+			float vector[3];
+			BKE_mesh_calc_poly_normal(mpoly, mloops, verts, vector);
+
+			Normal n = { vector[0], vector[1], vector[2] };
+			normals.push_back(n);
+			last_normal_index++;
 		}
 
-		for (j = 0; j < v; j++) {
-			if (fa->flag & ME_SMOOTH) {
-				if (nshar.find(*vv) != nshar.end())
-					*nn = nshar[*vv];
+
+		MLoop *mloop = mloops + mpoly->loopstart;
+		BCPolygonNormalsIndices poly_indices;
+		for (int loop_index = 0; loop_index < mpoly->totloop; loop_index++) {
+			unsigned int vertex_index = mloop[loop_index].v;
+			if (mpoly->flag & ME_SMOOTH) {
+				if (shared_normal_indices.find(vertex_index) != shared_normal_indices.end())
+					poly_indices.add_index (shared_normal_indices[vertex_index]);
 				else {
-					Normal n = {
-						(float)vert[*vv].no[0] / 32767.0f,
-						(float)vert[*vv].no[1] / 32767.0f,
-						(float)vert[*vv].no[2] / 32767.0f
-					};
-					nor.push_back(n);
-					*nn = (unsigned int)nor.size() - 1;
-					nshar[*vv] = *nn;
+
+					float vector[3];
+					normal_short_to_float_v3(vector, verts[vertex_index].no);
+
+					Normal n = { vector[0], vector[1], vector[2] };
+					normals.push_back(n);
+					last_normal_index++;
+
+					poly_indices.add_index(last_normal_index);
+					shared_normal_indices[vertex_index] = last_normal_index;
 				}
-				vv++;
 			}
 			else {
-				*nn = (unsigned int)nor.size() - 1;
+				poly_indices.add_index(last_normal_index);
 			}
-			nn++;
 		}
 
-		ind.push_back(f);
+		polygons_normals.push_back(poly_indices);
 	}
 }
 
@@ -787,19 +630,4 @@ COLLADASW::URI GeometryExporter::makeUrl(std::string id)
 	return COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, id);
 }
 
-#if 0
-int GeometryExporter::getTriCount(MFace *faces, int totface)
-{
-	int i;
-	int tris = 0;
-	for (i = 0; i < totface; i++) {
-		// if quad
-		if (faces[i].v4 != 0)
-			tris += 2;
-		else
-			tris++;
-	}
 
-	return tris;
-}
-#endif

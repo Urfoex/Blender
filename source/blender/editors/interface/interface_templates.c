@@ -32,6 +32,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_dynamicpaint_types.h"
+#include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 #include "DNA_object_force.h"
@@ -57,6 +58,7 @@
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
+#include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_packedFile.h"
 #include "BKE_particle.h"
@@ -281,11 +283,13 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 				if (id->flag & LIB_FAKEUSER) id_us_plus(id);
 				else id_us_min(id);
 			}
-			else return;
+			else {
+				return;
+			}
 			break;
 		case UI_ID_LOCAL:
 			if (id) {
-				if (id_make_local(id, 0)) {
+				if (id_make_local(id, false)) {
 					/* reassign to get get proper updates/notifiers */
 					idptr = RNA_property_pointer_get(&template->ptr, template->prop);
 					RNA_property_pointer_set(&template->ptr, template->prop, idptr);
@@ -459,7 +463,7 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 			else {
 				but = uiDefIconBut(block, BUT, 0, ICON_LIBRARY_DATA_DIRECT, 0, 0, UI_UNIT_X, UI_UNIT_Y,
 				                   NULL, 0, 0, 0, 0, TIP_("Direct linked library datablock, click to make local"));
-				if (!id_make_local(id, 1 /* test */) || (idfrom && idfrom->lib))
+				if (!id_make_local(id, true /* test */) || (idfrom && idfrom->lib))
 					uiButSetFlag(but, UI_BUT_DISABLED);
 			}
 
@@ -477,7 +481,7 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 
 			uiButSetNFunc(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_ALONE));
 			if (/* test only */
-			    (id_copy(id, NULL, 1) == FALSE) ||
+			    (id_copy(id, NULL, true) == false) ||
 			    (idfrom && idfrom->lib) ||
 			    (editable == FALSE) ||
 			    /* object in editmode - don't change data */
@@ -667,7 +671,7 @@ void uiTemplateAnyID(uiLayout *layout, PointerRNA *ptr, const char *propname, co
                      const char *text)
 {
 	PropertyRNA *propID, *propType;
-	uiLayout *row;
+	uiLayout *split, *row, *sub;
 	
 	/* get properties... */
 	propID = RNA_struct_find_property(ptr, propname);
@@ -683,22 +687,34 @@ void uiTemplateAnyID(uiLayout *layout, PointerRNA *ptr, const char *propname, co
 	}
 	
 	/* Start drawing UI Elements using standard defines */
-	row = uiLayoutRow(layout, TRUE);
+	split = uiLayoutSplit(layout, 0.33f, FALSE); /* NOTE: split amount here needs to be synced with normal labels */
+	
+	/* FIRST PART ................................................ */
+	row = uiLayoutRow(split, FALSE);
 	
 	/* Label - either use the provided text, or will become "ID-Block:" */
 	if (text) {
 		if (text[0])
 			uiItemL(row, text, ICON_NONE);
 	}
-	else
+	else {
 		uiItemL(row, IFACE_("ID-Block:"), ICON_NONE);
+	}
+	
+	/* SECOND PART ................................................ */
+	row = uiLayoutRow(split, TRUE);
 	
 	/* ID-Type Selector - just have a menu of icons */
-	/* FIXME: the icon-only setting doesn't work when we supply a blank name */
-	uiItemFullR(row, ptr, propType, 0, 0, UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	sub = uiLayoutRow(row, TRUE);                     /* HACK: special group just for the enum, otherwise we */
+	uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);  /*       we get ugly layout with text included too...  */
+	
+	uiItemFullR(sub, ptr, propType, 0, 0, UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 	
 	/* ID-Block Selector - just use pointer widget... */
-	uiItemFullR(row, ptr, propID, 0, 0, 0, "", ICON_NONE);
+	sub = uiLayoutRow(row, TRUE);                       /* HACK: special group to counteract the effects of the previous */
+	uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_EXPAND);  /*       enum, which now pushes everything too far right         */
+	
+	uiItemFullR(sub, ptr, propID, 0, 0, 0, "", ICON_NONE);
 }
 
 /********************* RNA Path Builder Template ********************/
@@ -2126,10 +2142,10 @@ static void curvemap_buttons_layout(uiLayout *layout, PointerRNA *ptr, char labe
 
 		uiLayoutRow(layout, TRUE);
 		uiBlockSetNFunc(block, curvemap_buttons_update, MEM_dupallocN(cb), cumap);
-		bt = uiDefButF(block, NUM, 0, "X", 0, 2 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
-		               &cmp->x, bounds.xmin, bounds.xmax, 1, 5, "");
-		bt = uiDefButF(block, NUM, 0, "Y", 0, 1 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
-		               &cmp->y, bounds.ymin, bounds.ymax, 1, 5, "");
+		uiDefButF(block, NUM, 0, "X", 0, 2 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
+		          &cmp->x, bounds.xmin, bounds.xmax, 1, 5, "");
+		uiDefButF(block, NUM, 0, "Y", 0, 1 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
+		          &cmp->y, bounds.ymin, bounds.ymax, 1, 5, "");
 	}
 
 	/* black/white levels */
@@ -2585,7 +2601,8 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 
 		/* if list length changes and active is out of view, scroll to it */
 		if ((ui_list->list_last_len != len) &&
-		    (activei < ui_list->list_scroll || activei >= ui_list->list_scroll + items)) {
+		    (activei < ui_list->list_scroll || activei >= ui_list->list_scroll + items))
+		{
 			ui_list->list_scroll = activei;
 		}
 
@@ -2717,7 +2734,7 @@ static void operator_search_cb(const bContext *C, void *UNUSED(arg), const char 
 {
 	GHashIterator *iter = WM_operatortype_iter();
 
-	for (; !BLI_ghashIterator_isDone(iter); BLI_ghashIterator_step(iter)) {
+	for (; BLI_ghashIterator_notDone(iter); BLI_ghashIterator_step(iter)) {
 		wmOperatorType *ot = BLI_ghashIterator_getValue(iter);
 
 		if ((ot->flag & OPTYPE_INTERNAL) && (G.debug & G_DEBUG_WM) == 0)
@@ -3048,4 +3065,66 @@ void uiTemplateColormanagedViewSettings(uiLayout *layout, bContext *UNUSED(C), P
 	uiItemR(col, &view_transform_ptr, "use_curve_mapping", 0, NULL, ICON_NONE);
 	if (view_settings->flag & COLORMANAGE_VIEW_USE_CURVES)
 		uiTemplateCurveMapping(col, &view_transform_ptr, "curve_mapping", 'c', TRUE, 0);
+}
+
+/********************************* Component Menu *************************************/
+
+typedef struct ComponentMenuArgs {
+	PointerRNA ptr;
+	char propname[64];	/* XXX arbitrary */
+} ComponentMenuArgs;
+/* NOTE: this is a block-menu, needs 0 events, otherwise the menu closes */
+static uiBlock *component_menu(bContext *C, ARegion *ar, void *args_v)
+{
+	ComponentMenuArgs *args = (ComponentMenuArgs *)args_v;
+	uiBlock *block;
+	uiLayout *layout;
+	
+	block = uiBeginBlock(C, ar, __func__, UI_EMBOSS);
+	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN);
+	
+	layout = uiLayoutColumn(uiBlockLayout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y, UI_GetStyle()), 0);
+	
+	uiItemR(layout, &args->ptr, args->propname, UI_ITEM_R_EXPAND, "", ICON_NONE);
+	
+	uiBoundsBlock(block, 6);
+	uiBlockSetDirection(block, UI_DOWN);	
+	uiEndBlock(C, block);
+	
+	return block;
+}
+void uiTemplateComponentMenu(uiLayout *layout, PointerRNA *ptr, const char *propname, const char *name)
+{
+	ComponentMenuArgs *args = MEM_callocN(sizeof(ComponentMenuArgs), "component menu template args");
+	uiBlock *block;
+	
+	args->ptr = *ptr;
+	BLI_strncpy(args->propname, propname, sizeof(args->propname));
+	
+	block = uiLayoutGetBlock(layout);
+	uiBlockBeginAlign(block);
+
+	uiDefBlockButN(block, component_menu, args, name, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y, "");
+	
+	uiBlockEndAlign(block);
+}
+
+/************************* Node Socket Icon **************************/
+
+void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float *color)
+{
+	uiBlock *block;
+	uiBut *but;
+	
+	block = uiLayoutGetBlock(layout);
+	uiBlockBeginAlign(block);
+	
+	/* XXX using explicit socket colors is not quite ideal.
+	 * Eventually it should be possible to use theme colors for this purpose,
+	 * but this requires a better design for extendable color palettes in user prefs.
+	 */
+	but = uiDefBut(block, NODESOCKET, 0, "", 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+	rgba_float_to_uchar(but->col, color);
+	
+	uiBlockEndAlign(block);
 }

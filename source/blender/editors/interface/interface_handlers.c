@@ -235,14 +235,13 @@ void ui_pan_to_scroll(const wmEvent *event, int *type, int *val)
 	BLI_assert(*type == MOUSEPAN);
 
 	/* sign differs, reset */
-	if ((dy > 0 && lastdy < 0) || (dy < 0 && lastdy > 0))
+	if ((dy > 0 && lastdy < 0) || (dy < 0 && lastdy > 0)) {
 		lastdy = dy;
+	}
 	else {
 		lastdy += dy;
 		
 		if (ABS(lastdy) > (int)UI_UNIT_Y) {
-			int dy = event->prevy - event->y;
-			
 			if (U.uiflag2 & USER_TRACKPAD_NATURAL)
 				dy = -dy;
 			
@@ -740,6 +739,151 @@ static void ui_apply_but_CHARTAB(bContext *C, uiBut *but, uiHandleButtonData *da
 
 /* ****************** drag drop code *********************** */
 
+#ifdef USE_DRAG_TOGGLE
+
+typedef struct uiDragToggleHandle {
+	/* init */
+	bool is_set;
+	float but_cent_start[2];
+	eButType but_type_start;
+
+	bool xy_lock[2];
+	int  xy_last[2];
+} uiDragToggleHandle;
+
+static bool ui_drag_toggle_set_xy_xy(bContext *C, ARegion *ar, const bool is_set, const eButType but_type_start,
+                                     const int xy_src[2], const int xy_dst[2])
+{
+	bool change = false;
+	uiBlock *block;
+
+	for (block = ar->uiblocks.first; block; block = block->next) {
+		uiBut *but;
+
+		float xy_a_block[2] = {UNPACK2(xy_src)};
+		float xy_b_block[2] = {UNPACK2(xy_dst)};
+
+		ui_window_to_block_fl(ar, block, &xy_a_block[0], &xy_a_block[1]);
+		ui_window_to_block_fl(ar, block, &xy_b_block[0], &xy_b_block[1]);
+
+		for (but = block->buttons.first; but; but = but->next) {
+			if (ui_is_but_interactive(but)) {
+				if (BLI_rctf_isect_segment(&but->rect, xy_a_block, xy_b_block)) {
+
+					/* execute the button */
+					if (ui_is_but_bool(but) && but->type == but_type_start) {
+						/* is it pressed? */
+						bool is_set_but = ui_is_but_push(but);
+						BLI_assert(ui_is_but_bool(but) == true);
+						if (is_set_but != is_set) {
+							uiButExecute(C, but);
+							change = true;
+						}
+					}
+					/* done */
+
+				}
+			}
+		}
+	}
+
+	return change;
+}
+
+static void ui_drag_toggle_set(bContext *C, uiDragToggleHandle *drag_info, const int xy_input[2])
+{
+	ARegion *ar = CTX_wm_region(C);
+	bool do_draw = false;
+	int xy[2];
+
+	/**
+	 * Initialize Locking:
+	 *
+	 * Check if we need to initialize the lock axis by finding if the first
+	 * button we mouse over is X or Y aligned, then lock the mouse to that axis after.
+	 */
+	if (drag_info->xy_lock[0] == false && drag_info->xy_lock[1] == false) {
+		/* first store the buttons original coords */
+		uiBut *but = ui_but_find_mouse_over(ar, xy_input[0], xy_input[1]);
+		if (but) {
+			const float but_cent_new[2] = {BLI_rctf_cent_x(&but->rect),
+			                               BLI_rctf_cent_y(&but->rect)};
+
+			/* check if this is a different button, chances are high the button wont move about :) */
+			if (len_manhattan_v2v2(drag_info->but_cent_start, but_cent_new) > 1.0f) {
+				if (fabsf(drag_info->but_cent_start[0] - but_cent_new[0]) <
+				    fabsf(drag_info->but_cent_start[1] - but_cent_new[1]))
+				{
+					drag_info->xy_lock[0] = true;
+				}
+				else {
+					drag_info->xy_lock[1] = true;
+				}
+			}
+		}
+	}
+	/* done with axis locking */
+
+
+	xy[0] = (drag_info->xy_lock[0] == false) ? xy_input[0] : drag_info->xy_last[0];
+	xy[1] = (drag_info->xy_lock[1] == false) ? xy_input[1] : drag_info->xy_last[1];
+
+
+	/* touch all buttons between last mouse coord and this one */
+	do_draw = ui_drag_toggle_set_xy_xy(C, ar, drag_info->is_set, drag_info->but_type_start, drag_info->xy_last, xy);
+
+	if (do_draw) {
+		ED_region_tag_redraw(ar);
+	}
+
+	copy_v2_v2_int(drag_info->xy_last, xy);
+}
+
+static void ui_handler_region_drag_toggle_remove(bContext *UNUSED(C), void *userdata)
+{
+	uiDragToggleHandle *drag_info = userdata;
+	MEM_freeN(drag_info);
+}
+
+static int ui_handler_region_drag_toggle(bContext *C, const wmEvent *event, void *userdata)
+{
+	uiDragToggleHandle *drag_info = userdata;
+	bool done = false;
+
+	switch (event->type) {
+		case LEFTMOUSE:
+		{
+			if (event->val != KM_PRESS) {
+				done = true;
+			}
+			break;
+		}
+		case MOUSEMOVE:
+		{
+			ui_drag_toggle_set(C, drag_info, &event->x);
+			break;
+		}
+	}
+
+	if (done) {
+		wmWindow *win = CTX_wm_window(C);
+		WM_event_remove_ui_handler(&win->modalhandlers,
+		                           ui_handler_region_drag_toggle,
+		                           ui_handler_region_drag_toggle_remove,
+		                           drag_info, false);
+		ui_handler_region_drag_toggle_remove(C, drag_info);
+
+		WM_event_add_mousemove(C);
+		return WM_UI_HANDLER_BREAK;
+	}
+	else {
+		return WM_UI_HANDLER_CONTINUE;
+	}
+}
+
+#endif  /* USE_DRAG_TOGGLE */
+
+
 static int ui_but_mouse_inside_icon(uiBut *but, ARegion *ar, const wmEvent *event)
 {
 	rcti rect;
@@ -775,17 +919,18 @@ static int ui_but_start_drag(bContext *C, uiBut *but, uiHandleButtonData *data, 
 		data->cancel = TRUE;
 #ifdef USE_DRAG_TOGGLE
 		if (ui_is_but_bool(but)) {
-			/* assumes button has already been pressed */
-			const bool is_set = ui_is_but_push(but);
-			PointerRNA ptr;
-			/* auto-key is typically called on mouse-up, but we'r leaving the button so call here */
-			ui_apply_autokey(C, but);
-			WM_operator_properties_create(&ptr, "UI_OT_drag_toggle");
-			RNA_boolean_set(&ptr, "state", is_set);
-			RNA_int_set(&ptr, "last_x", data->dragstartx);
-			RNA_int_set(&ptr, "last_y", data->dragstarty);
-			WM_operator_name_call(C, "UI_OT_drag_toggle", WM_OP_INVOKE_DEFAULT, &ptr);
-			WM_operator_properties_free(&ptr);
+			uiDragToggleHandle *drag_info = MEM_callocN(sizeof(*drag_info), __func__);
+
+			drag_info->is_set = ui_is_but_push(but);
+			drag_info->but_cent_start[0] = BLI_rctf_cent_x(&but->rect);
+			drag_info->but_cent_start[1] = BLI_rctf_cent_y(&but->rect);
+			drag_info->but_type_start = but->type;
+			copy_v2_v2_int(drag_info->xy_last, &event->x);
+
+			WM_event_add_ui_handler(C, &data->window->modalhandlers,
+			                        ui_handler_region_drag_toggle,
+			                        ui_handler_region_drag_toggle_remove,
+			                        drag_info);
 		}
 		else
 #endif
@@ -1254,7 +1399,11 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 			/* pass */
 		}
 		else if (mode == 'c') {
-			ui_get_but_string(but, buf, sizeof(buf));
+			/* Get many decimal places, then strip trailing zeros.
+			 * note: too high values start to give strange results (6 or so is ok) */
+			ui_get_but_string_ex(but, buf, sizeof(buf), 6);
+			BLI_str_rstrip_float_zero(buf, '\0');
+
 			WM_clipboard_text_set(buf, 0);
 		}
 		else {
@@ -1836,6 +1985,10 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 	data->str = MEM_callocN(sizeof(char) * data->maxlen + 1, "textedit str");
 	ui_get_but_string(but, data->str, data->maxlen);
 
+	if (ui_is_but_float(but) && !ui_is_but_unit(but)) {
+		BLI_str_rstrip_float_zero(data->str, '\0');
+	}
+
 	if (ELEM3(but->type, NUM, NUMABS, NUMSLI)) {
 		ui_convert_to_unit_alt_name(but, data->str, data->maxlen);
 	}
@@ -2179,7 +2332,7 @@ static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
 		data->coba = (ColorBand *)but->poin;
 		but->editcoba = data->coba;
 	}
-	else if (ELEM3(but->type, BUT_NORMAL, HSVCUBE, HSVCIRCLE)) {
+	else if (ELEM4(but->type, BUT_NORMAL, HSVCUBE, HSVCIRCLE, COLOR)) {
 		ui_get_but_vectorf(but, data->origvec);
 		copy_v3_v3(data->vec, data->origvec);
 		but->editvec = data->vec;
@@ -3001,9 +3154,6 @@ static bool ui_numedit_but_SLI(uiBut *but, uiHandleButtonData *data,
 		BLI_rctf_clamp_pt_v(&but->rect, data->ungrab_mval);
 	}
 #endif
-	if (is_horizontal == false) {
-		mx_fl = my_fl;
-	}
 	/* done correcting mouse */
 
 
@@ -4008,20 +4158,27 @@ static int ui_do_but_COLORBAND(bContext *C, uiBlock *block, uiBut *but, uiHandle
 	return WM_UI_HANDLER_CONTINUE;
 }
 
-static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
-                                float mx, float my, const short shift)
+static int ui_numedit_but_CURVE(uiBlock *block, uiBut *but, uiHandleButtonData *data, int snap,
+                                int evtx, int evty, const short shift)
 {
 	CurveMapping *cumap = (CurveMapping *)but->poin;
 	CurveMap *cuma = cumap->cm + cumap->cur;
 	CurveMapPoint *cmp = cuma->curve;
-	float fx, fy, zoomx, zoomy /*, offsx, offsy */ /* UNUSED */;
+	float fx, fy, zoomx, zoomy;
+	int mx, my, dragx, dragy;
 	int a, changed = 0;
 
+	/* evtx evty and drag coords are absolute mousecoords, prevents errors when editing when layout changes */
+	mx = evtx;
+	my = evty;
+	ui_window_to_block(data->region, block, &mx, &my);
+	dragx = data->draglastx;
+	dragy = data->draglasty;
+	ui_window_to_block(data->region, block, &dragx, &dragy);
+	
 	zoomx = BLI_rctf_size_x(&but->rect) / BLI_rctf_size_x(&cumap->curr);
 	zoomy = BLI_rctf_size_y(&but->rect) / BLI_rctf_size_y(&cumap->curr);
-	/* offsx = cumap->curr.xmin; */
-	/* offsy = cumap->curr.ymin; */
-
+	
 	if (snap) {
 		float d[2];
 
@@ -4037,8 +4194,8 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 		const float mval_factor = ui_mouse_scale_warp_factor(shift);
 		int moved_point = 0;     /* for ctrl grid, can't use orig coords because of sorting */
 
-		fx = (mx - data->draglastx) / zoomx;
-		fy = (my - data->draglasty) / zoomy;
+		fx = (mx - dragx) / zoomx;
+		fy = (my - dragy) / zoomy;
 
 		fx *= mval_factor;
 		fy *= mval_factor;
@@ -4062,8 +4219,8 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 		curvemapping_changed(cumap, FALSE);
 		
 		if (moved_point) {
-			data->draglastx = mx;
-			data->draglasty = my;
+			data->draglastx = evtx;
+			data->draglasty = evty;
 			changed = 1;
 
 #ifdef USE_CONT_MOUSE_CORRECT
@@ -4082,8 +4239,8 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 		data->dragchange = 1; /* mark for selection */
 	}
 	else {
-		fx = (mx - data->draglastx) / zoomx;
-		fy = (my - data->draglasty) / zoomy;
+		fx = (mx - dragx) / zoomx;
+		fy = (my - dragy) / zoomy;
 		
 		/* clamp for clip */
 		if (cumap->flag & CUMA_DO_CLIP) {
@@ -4102,8 +4259,8 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 		cumap->curr.xmax -= fx;
 		cumap->curr.ymax -= fy;
 		
-		data->draglastx = mx;
-		data->draglasty = my;
+		data->draglastx = evtx;
+		data->draglasty = evty;
 
 		changed = 1;
 	}
@@ -4118,7 +4275,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 	mx = event->x;
 	my = event->y;
 	ui_window_to_block(data->region, block, &mx, &my);
-
+	
 	if (data->state == BUTTON_STATE_HIGHLIGHT) {
 		if (event->type == LEFTMOUSE && event->val == KM_PRESS) {
 			CurveMapping *cumap = (CurveMapping *)but->poin;
@@ -4208,11 +4365,11 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 			}
 
 			data->dragsel = sel;
-
-			data->dragstartx = mx;
-			data->dragstarty = my;
-			data->draglastx = mx;
-			data->draglasty = my;
+			
+			data->dragstartx = event->x;
+			data->dragstarty = event->y;
+			data->draglastx = event->x;
+			data->draglasty = event->y;
 
 			button_activate_state(C, but, BUTTON_STATE_NUM_EDITING);
 			return WM_UI_HANDLER_BREAK;
@@ -4220,8 +4377,9 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
 		if (event->type == MOUSEMOVE) {
-			if (mx != data->draglastx || my != data->draglasty) {
-				if (ui_numedit_but_CURVE(but, data, event->ctrl, mx, my, event->shift))
+			if (event->x != data->draglastx || event->y != data->draglasty) {
+				
+				if (ui_numedit_but_CURVE(block, but, data, event->ctrl, event->x, event->y, event->shift))
 					ui_numedit_apply(C, block, but, data);
 			}
 		}
@@ -4865,7 +5023,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
 
 	if (but->rnapoin.data && but->rnaprop) {
-		short is_anim = RNA_property_animateable(&but->rnapoin, but->rnaprop);
+		bool is_anim = RNA_property_animateable(&but->rnapoin, but->rnaprop);
 
 		/* second slower test, saved people finding keyframe items in menus when its not possible */
 		if (is_anim)
@@ -5276,6 +5434,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 		case LISTROW:
 		case BUT_IMAGE:
 		case PROGRESSBAR:
+		case NODESOCKET:
 			retval = ui_do_but_EXIT(C, but, data, event);
 			break;
 		case HISTOGRAM:
@@ -6146,7 +6305,7 @@ static void ui_handle_button_activate(bContext *C, ARegion *ar, uiBut *but, uiBu
 static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 {
 	uiHandleButtonData *data = but->active;
-	const uiButtonActivateType state_orig = data->state;
+	const uiHandleButtonState state_orig = data->state;
 	uiBlock *block;
 	ARegion *ar;
 	int retval;
@@ -6318,9 +6477,9 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 			 * This is needed to make sure if a button was active,
 			 * it stays active while the mouse is over it.
 			 * This avoids adding mousemoves, see: [#33466] */
-			if (ELEM(state_orig, BUTTON_ACTIVATE, BUTTON_ACTIVATE_OVER)) {
+			if (ELEM(state_orig, BUTTON_STATE_INIT, BUTTON_STATE_HIGHLIGHT)) {
 				if (ui_but_find_mouse_over(ar, event->x, event->y) == but) {
-					button_activate_init(C, ar, but, state_orig);
+					button_activate_init(C, ar, but, BUTTON_ACTIVATE_OVER);
 				}
 			}
 		}

@@ -24,15 +24,8 @@
  *  \ingroup RNA
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "RNA_access.h"
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
 
 #include "DNA_action_types.h"
 #include "DNA_customdata_types.h"
@@ -51,6 +44,12 @@
 #include "BKE_paint.h"
 #include "BKE_tessmesh.h"
 #include "BKE_group.h" /* needed for object_in_group() */
+
+#include "RNA_access.h"
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "rna_internal.h"
 
 #include "BLO_sys_types.h" /* needed for intptr_t used in ED_mesh.h */
 #include "ED_mesh.h"
@@ -384,7 +383,7 @@ static void rna_Object_data_set(PointerRNA *ptr, PointerRNA value)
 		}
 	}
 	else if (ob->type == OB_MESH) {
-		set_mesh(ob, (Mesh *)id);
+		BKE_mesh_assign_object(ob, (Mesh *)id);
 	}
 	else {
 		if (ob->data) {
@@ -2031,6 +2030,7 @@ static void rna_def_object(BlenderRNA *brna)
 		{OB_BOUND_SPHERE, "SPHERE", 0, "Sphere", "Draw bounds as sphere"},
 		{OB_BOUND_CYLINDER, "CYLINDER", 0, "Cylinder", "Draw bounds as cylinder"},
 		{OB_BOUND_CONE, "CONE", 0, "Cone", "Draw bounds as cone"},
+		{OB_BOUND_CAPSULE, "CAPSULE", 0, "Capsule", "Draw bounds as capsule"},
 		{0, NULL, 0, NULL, NULL}
 	};
 

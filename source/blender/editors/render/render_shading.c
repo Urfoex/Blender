@@ -379,7 +379,7 @@ static int new_material_exec(bContext *C, wmOperator *UNUSED(op))
 		ma = BKE_material_add(bmain, "Material");
 
 		if (BKE_scene_use_new_shading_nodes(scene)) {
-			ED_node_shader_default(scene, &ma->id);
+			ED_node_shader_default(C, &ma->id);
 			ma->use_nodes = TRUE;
 		}
 	}
@@ -481,7 +481,7 @@ static int new_world_exec(bContext *C, wmOperator *UNUSED(op))
 		wo = add_world(bmain, "World");
 
 		if (BKE_scene_use_new_shading_nodes(scene)) {
-			ED_node_shader_default(scene, &wo->id);
+			ED_node_shader_default(C, &wo->id);
 			wo->use_nodes = TRUE;
 		}
 	}
@@ -705,7 +705,7 @@ static int envmap_save_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int envmap_save_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+static int envmap_save_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
 	//Scene *scene= CTX_data_scene(C);
 	

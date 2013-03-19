@@ -24,15 +24,8 @@
  *  \ingroup RNA
  */
 
-
 #include <stdlib.h>
 #include <limits.h>
-
-#include "RNA_access.h"
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_object_types.h"
@@ -42,6 +35,8 @@
 
 #include "BLI_math.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_animsys.h"
 #include "BKE_global.h"
 #include "BKE_sequencer.h"
@@ -49,9 +44,13 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "WM_types.h"
+#include "RNA_access.h"
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
 
-#include "BLF_translation.h"
+#include "rna_internal.h"
+
+#include "WM_types.h"
 
 typedef struct EffectInfo {
 	const char *struct_name;
@@ -1326,6 +1325,7 @@ static void rna_def_sequence(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_enum_items(prop, seq_type_items);
 	RNA_def_property_ui_text(prop, "Type", "");
+	RNA_def_property_translation_context(prop, BLF_I18NCONTEXT_ID_SEQUENCE);
 	RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_update");
 
 

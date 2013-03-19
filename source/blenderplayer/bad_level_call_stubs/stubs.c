@@ -67,6 +67,7 @@ struct Mask;
 struct Material;
 struct MenuType;
 struct Mesh;
+struct MetaBall;
 struct ModifierData;
 struct MovieClip;
 struct MultiresModifierData;
@@ -105,10 +106,14 @@ struct bConstraintOb;
 struct bConstraintTarget;
 struct bContextDataResult;
 struct bNode;
+struct bNodeType;
 struct bNodeSocket;
+struct bNodeSocketType;
 struct bNodeTree;
+struct bNodeTreeType;
 struct bPoseChannel;
 struct bPythonConstraint;
+struct bTheme;
 struct uiLayout;
 struct wmEvent;
 struct wmKeyConfig;
@@ -194,7 +199,7 @@ void WM_menutype_free(void) {}
 void WM_menutype_freelink(struct MenuType *mt) {}
 int WM_menutype_add(struct MenuType *mt) {return 0;}
 int WM_operator_props_dialog_popup(struct bContext *C, struct wmOperator *op, int width, int height) {return 0;}
-int WM_operator_confirm(struct bContext *C, struct wmOperator *op, struct wmEvent *event) {return 0;}
+int WM_operator_confirm(struct bContext *C, struct wmOperator *op, const struct wmEvent *event) {return 0;}
 struct MenuType *WM_menutype_find(const char *idname, int quiet) {return (struct MenuType *) NULL;}
 void WM_operator_stack_clear(struct bContext *C) {}
 void WM_operator_handlers_clear(struct bContext *C, struct wmOperatorType *ot) {}
@@ -223,7 +228,7 @@ void ED_armature_edit_bone_remove(struct bArmature *arm, struct EditBone *exBone
 void object_test_constraints(struct Object *owner) {}
 void ED_object_parent(struct Object *ob, struct Object *par, int type, const char *substr) {}
 void ED_object_constraint_set_active(struct Object *ob, struct bConstraint *con) {}
-void ED_node_composit_default(struct Scene *sce) {}
+void ED_node_composit_default(struct bContext *C, struct Scene *scene) {}
 void *ED_region_draw_cb_activate(struct ARegionType *art, void(*draw)(const struct bContext *, struct ARegion *, void *), void *custumdata, int type) {return 0;} /* XXX this one looks weird */
 void *ED_region_draw_cb_customdata(void *handle) {return 0;} /* XXX This one looks wrong also */
 void ED_region_draw_cb_exit(struct ARegionType *art, void *handle) {}
@@ -300,10 +305,21 @@ void ED_area_newspace(struct bContext *C, struct ScrArea *sa, int type) {}
 void ED_region_tag_redraw(struct ARegion *ar) {}
 void WM_event_add_fileselect(struct bContext *C, struct wmOperator *op) {}
 void WM_cursor_wait(int val) {}
-void ED_node_texture_default(struct Tex *tx) {}
-void ED_node_changed_update(struct bContext *C, struct bNode *node) {}
-void ED_node_generic_update(struct Main *bmain, struct bNodeTree *ntree, struct bNode *node) {}
-void ED_node_tree_update(struct SpaceNode *snode, struct Scene *scene) {}
+void ED_node_texture_default(struct bContext *C, struct Tex *tx) {}
+void ED_node_tag_update_id(struct ID *id) {}
+void ED_node_tag_update_nodetree(struct Main *bmain, struct bNodeTree *ntree) {}
+void ED_node_tree_update(const struct bContext *C) {}
+void ED_node_set_tree_type(struct SpaceNode *snode, struct bNodeTreeType *typeinfo){}
+void ED_init_custom_node_type(struct bNodeType *ntype){}
+void ED_init_custom_node_socket_type(struct bNodeSocketType *stype){}
+void ED_init_standard_node_socket_type(struct bNodeSocketType *stype) {}
+void ED_init_node_socket_type_virtual(struct bNodeSocketType *stype) {}
+int ED_node_tree_path_length(struct SpaceNode *snode){return 0;}
+void ED_node_tree_path_get(struct SpaceNode *snode, char *value){}
+void ED_node_tree_path_get_fixedbuf(struct SpaceNode *snode, char *value, int max_length){}
+void ED_node_tree_start(struct SpaceNode *snode, struct bNodeTree *ntree, struct ID *id, struct ID *from){}
+void ED_node_tree_push(struct SpaceNode *snode, struct bNodeTree *ntree, struct bNode *gnode){}
+void ED_node_tree_pop(struct SpaceNode *snode){}
 void ED_view3d_scene_layers_update(struct Main *bmain, struct Scene *scene) {}
 int ED_view3d_scene_layer_set(int lay, const int *values) {return 0;}
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar) {}
@@ -315,7 +331,7 @@ void ED_view3d_update_viewmat(struct Scene *scene, struct View3D *v3d, struct AR
 float ED_view3d_grid_scale(struct Scene *scene, struct View3D *v3d, const char **grid_unit) {return 0.0f;}
 void view3d_apply_mat4(float mat[4][4], float *ofs, float *quat, float *dist) {}
 int text_file_modified(struct Text *text) {return 0;}
-void ED_node_shader_default(struct Material *ma) {}
+void ED_node_shader_default(struct bContext *C, struct ID *id) {}
 void ED_screen_animation_timer_update(struct bContext *C, int redraws) {}
 void ED_screen_animation_playing(struct wmWindowManager *wm) {}
 void ED_base_object_select(struct Base *base, short mode) {}
@@ -413,6 +429,7 @@ void uiLayoutSetContextPointer(struct uiLayout *layout, char *name, struct Point
 char *uiLayoutIntrospect(struct uiLayout *layout) {return (char *)NULL;}
 void UI_reinit_font(void) {}
 int UI_rnaptr_icon_get(struct bContext *C, struct PointerRNA *ptr, int rnaicon, int big) {return 0;}
+struct bTheme *UI_GetTheme(void) {return (struct bTheme *) NULL;};
 
 /* rna template */
 void uiTemplateAnyID(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, char *text) {}
@@ -453,12 +470,15 @@ void uiTemplateMarker(struct uiLayout *layout, struct PointerRNA *ptr, const cha
 void uiTemplateImageSettings(struct uiLayout *layout, struct PointerRNA *imfptr) {}
 void uiTemplateColorspaceSettings(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname) {}
 void uiTemplateColormanagedViewSettings(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, int show_global_settings) {}
+void uiTemplateComponentMenu(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, const char *name){}
+void uiTemplateNodeSocket(struct uiLayout *layout, struct bContext *C, float *color) {}
 
 /* rna render */
 struct RenderResult *RE_engine_begin_result(struct RenderEngine *engine, int x, int y, int w, int h) {return (struct RenderResult *) NULL;}
 struct RenderResult *RE_AcquireResultRead(struct Render *re) {return (struct RenderResult *) NULL;}
 struct RenderResult *RE_AcquireResultWrite(struct Render *re) {return (struct RenderResult *) NULL;}
 struct RenderStats *RE_GetStats(struct Render *re) {return (struct RenderStats *) NULL;}
+struct RenderData *RE_engine_get_render_data(struct Render *re) {return (struct RenderData *) NULL;}
 void RE_engine_update_result(struct RenderEngine *engine, struct RenderResult *result) {}
 void RE_engine_update_progress(struct RenderEngine *engine, float progress) {}
 void RE_engine_end_result(struct RenderEngine *engine, struct RenderResult *result) {}
@@ -493,8 +513,8 @@ void WM_operator_properties_free(struct PointerRNA *ptr) {}
 void WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring) {}
 void WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot) {}
 void WM_operator_properties_sanitize(struct PointerRNA *ptr, const short no_context) {};
-void WM_operatortype_append_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata) {}
-void WM_operatortype_append_macro_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata) {}
+void WM_operatortype_append_ptr(void (*opfunc)(struct wmOperatorType*, void *), void *userdata) {}
+void WM_operatortype_append_macro_ptr(void (*opfunc)(struct wmOperatorType*, void *), void *userdata) {}
 void WM_operator_bl_idname(char *to, const char *from) {}
 void WM_operator_py_idname(char *to, const char *from) {}
 void WM_operator_ui_popup(struct bContext *C, struct wmOperator *op, int width, int height) {}
@@ -517,7 +537,6 @@ float sculpt_get_brush_alpha(struct Brush *brush) {return 0.0f;}
 void sculpt_set_brush_alpha(struct Brush *brush, float alpha) {}
 void ED_sculpt_modifiers_changed(struct Object *ob) {}
 void ED_mesh_calc_tessface(struct Mesh *mesh) {}
-void BKE_brush_gen_texture_cache(struct Brush *br, int half_side) {}
 
 /* bpy/python internal api */
 void operator_wrapper(struct wmOperatorType *ot, void *userdata) {}

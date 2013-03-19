@@ -24,15 +24,9 @@
  *  \ingroup RNA
  */
 
-
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
 
 #include "DNA_brush_types.h"
 #include "DNA_lamp_types.h"
@@ -47,6 +41,11 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_node.h"
+
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "rna_internal.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -108,6 +107,7 @@ EnumPropertyItem blend_type_items[] = {
 
 #include "RNA_access.h"
 
+#include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_image.h"
 #include "BKE_texture.h"
@@ -168,7 +168,7 @@ static void rna_Texture_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *pt
 	}
 	else if (GS(id->name) == ID_NT) {
 		bNodeTree *ntree = ptr->id.data;
-		ED_node_generic_update(bmain, ntree, NULL);
+		ED_node_tag_update_nodetree(bmain, ntree);
 	}
 }
 
@@ -382,18 +382,21 @@ static void rna_Texture_use_color_ramp_set(PointerRNA *ptr, int value)
 	else tex->flag &= ~TEX_COLORBAND;
 
 	if ((tex->flag & TEX_COLORBAND) && tex->coba == NULL)
-		tex->coba = add_colorband(0);
+		tex->coba = add_colorband(false);
 }
 
-static void rna_Texture_use_nodes_set(PointerRNA *ptr, int v)
+static void rna_Texture_use_nodes_update(bContext *C, PointerRNA *ptr)
 {
 	Tex *tex = (Tex *)ptr->data;
 	
-	tex->use_nodes = v;
-	tex->type = 0;
+	if (tex->use_nodes) {
+		tex->type = 0;
+		
+		if (tex->nodetree == NULL)
+			ED_node_texture_default(C, tex);
+	}
 	
-	if (v && tex->nodetree == NULL)
-		ED_node_texture_default(tex);
+	rna_Texture_nodes_update(CTX_data_main(C), CTX_data_scene(C), ptr);
 }
 
 static void rna_ImageTexture_mipmap_set(PointerRNA *ptr, int value)
@@ -1194,6 +1197,11 @@ static void rna_def_texture_image(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_flip_axis", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "imaflag", TEX_IMAROT);
 	RNA_def_property_ui_text(prop, "Flip Axis", "Flip the texture's X and Y axis");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+
+	prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "imaflag", TEX_USEALPHA);
+	RNA_def_property_ui_text(prop, "Use Alpha", "Use the alpha channel information in the image");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
 
 	prop = RNA_def_property(srna, "use_calculate_alpha", PROP_BOOLEAN, PROP_NONE);
@@ -2017,9 +2025,9 @@ static void rna_def_texture(BlenderRNA *brna)
 	/* nodetree */
 	prop = RNA_def_property(srna, "use_nodes", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_nodes", 1);
-	RNA_def_property_boolean_funcs(prop, NULL, "rna_Texture_use_nodes_set");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_ui_text(prop, "Use Nodes", "Make this a node-based texture");
-	RNA_def_property_update(prop, 0, "rna_Texture_nodes_update");
+	RNA_def_property_update(prop, 0, "rna_Texture_use_nodes_update");
 	
 	prop = RNA_def_property(srna, "node_tree", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "nodetree");

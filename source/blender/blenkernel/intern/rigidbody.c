@@ -637,12 +637,12 @@ void BKE_rigidbody_validate_sim_constraint(RigidBodyWorld *rbw, Object *ob, shor
 						RB_constraint_set_limits_6dof(rbc->physics_constraint, RB_LIMIT_ANG_Z, 0.0f, -1.0f);
 					break;
 				case RBC_TYPE_MOTOR:
-				    rbc->physics_constraint = RB_constraint_new_motor(loc, rot, rb1, rb2);
+					rbc->physics_constraint = RB_constraint_new_motor(loc, rot, rb1, rb2);
 
-				    RB_constraint_set_enable_motor(rbc->physics_constraint, rbc->flag & RBC_FLAG_USE_MOTOR_LIN, rbc->flag & RBC_FLAG_USE_MOTOR_ANG);
+					RB_constraint_set_enable_motor(rbc->physics_constraint, rbc->flag & RBC_FLAG_USE_MOTOR_LIN, rbc->flag & RBC_FLAG_USE_MOTOR_ANG);
 					RB_constraint_set_max_impulse_motor(rbc->physics_constraint, rbc->motor_lin_max_impulse, rbc->motor_ang_max_impulse);
 					RB_constraint_set_target_velocity_motor(rbc->physics_constraint, rbc->motor_lin_target_velocity, rbc->motor_ang_target_velocity);
-				    break;
+					break;
 			}
 		}
 		else { /* can't create constraint without both rigid bodies */
@@ -1220,6 +1220,35 @@ void BKE_rigidbody_cache_reset(RigidBodyWorld *rbw)
 
 /* ------------------ */
 
+/* Rebuild rigid body world */
+/* NOTE: this needs to be called before frame update to work correctly */
+void BKE_rigidbody_rebuild_world(Scene *scene, float ctime)
+{
+	RigidBodyWorld *rbw = scene->rigidbody_world;
+	PointCache *cache;
+	PTCacheID pid;
+	int startframe, endframe;
+
+	BKE_ptcache_id_from_rigidbody(&pid, NULL, rbw);
+	BKE_ptcache_id_time(&pid, scene, ctime, &startframe, &endframe, NULL);
+	cache = rbw->pointcache;
+
+	/* flag cache as outdated if we don't have a world or number of objects in the simulation has changed */
+	if (rbw->physics_world == NULL || rbw->numbodies != BLI_countlist(&rbw->group->gobject)) {
+		cache->flag |= PTCACHE_OUTDATED;
+	}
+
+	if (ctime <= startframe + 1 && rbw->ltime == startframe) {
+		if (cache->flag & PTCACHE_OUTDATED) {
+			BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
+			rigidbody_update_simulation(scene, rbw, true);
+			BKE_ptcache_validate(cache, (int)ctime);
+			cache->last_exact = 0;
+			cache->flag &= ~PTCACHE_REDO_NEEDED;
+		}
+	}
+}
+
 /* Run RigidBody simulation for the specified physics world */
 void BKE_rigidbody_do_simulation(Scene *scene, float ctime)
 {
@@ -1233,29 +1262,9 @@ void BKE_rigidbody_do_simulation(Scene *scene, float ctime)
 	BKE_ptcache_id_time(&pid, scene, ctime, &startframe, &endframe, NULL);
 	cache = rbw->pointcache;
 
-	rbw->flag &= ~RBW_FLAG_FRAME_UPDATE;
-
-	/* flag cache as outdated if we don't have a world or number of objects in the simulation has changed */
-	if (rbw->physics_world == NULL || rbw->numbodies != BLI_countlist(&rbw->group->gobject)) {
-		cache->flag |= PTCACHE_OUTDATED;
-	}
-
 	if (ctime <= startframe) {
 		rbw->ltime = startframe;
-		/* reset and rebuild simulation if necessary */
-		if (cache->flag & PTCACHE_OUTDATED) {
-			BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
-			rigidbody_update_simulation(scene, rbw, true);
-			BKE_ptcache_validate(cache, (int)ctime);
-			cache->last_exact = 0;
-			cache->flag &= ~PTCACHE_REDO_NEEDED;
-		}
 		return;
-	}
-	/* rebuild world if it's outdated on second frame */
-	else if (ctime == startframe + 1 && rbw->ltime == startframe && cache->flag & PTCACHE_OUTDATED) {
-		BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
-		rigidbody_update_simulation(scene, rbw, true);
 	}
 	/* make sure we don't go out of cache frame range */
 	else if (ctime > endframe) {
@@ -1329,6 +1338,7 @@ void BKE_rigidbody_remove_constraint(Scene *scene, Object *ob) {}
 void BKE_rigidbody_sync_transforms(RigidBodyWorld *rbw, Object *ob, float ctime) {}
 void BKE_rigidbody_aftertrans_update(Object *ob, float loc[3], float rot[3], float quat[4], float rotAxis[3], float rotAngle) {}
 void BKE_rigidbody_cache_reset(RigidBodyWorld *rbw) {}
+void BKE_rigidbody_rebuild_world(Scene *scene, float ctime) {}
 void BKE_rigidbody_do_simulation(Scene *scene, float ctime) {}
 
 #ifdef __GNUC__

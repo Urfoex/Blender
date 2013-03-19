@@ -381,6 +381,10 @@ static short acf_generic_dataexpand_setting_valid(bAnimContext *ac, bAnimListEle
 		case ACHANNEL_SETTING_MUTE:
 			return ((ac) && (ac->spacetype == SPACE_NLA));
 			
+		/* select is ok for most "ds*" channels (e.g. dsmat) */
+		case ACHANNEL_SETTING_SELECT:
+			return 1;
+			
 		/* other flags are never supported */
 		default:
 			return 0;
@@ -422,7 +426,7 @@ static void acf_summary_backdrop(bAnimContext *ac, bAnimListElem *ale, float ymi
 static void acf_summary_name(bAnimListElem *UNUSED(ale), char *name)
 {
 	if (name)
-		BLI_strncpy(name, "DopeSheet Summary", ANIM_CHAN_NAME_SIZE);
+		BLI_strncpy(name, IFACE_("DopeSheet Summary"), ANIM_CHAN_NAME_SIZE);
 }
 
 // FIXME: this is really a temp icon I think
@@ -893,6 +897,27 @@ static void acf_fcurve_name(bAnimListElem *ale, char *name)
 	getname_anim_fcurve(name, ale->id, ale->data);
 }
 
+/* "name" property for fcurve entries */
+static short acf_fcurve_name_prop(bAnimListElem *ale, PointerRNA *ptr, PropertyRNA **prop)
+{
+	FCurve *fcu = (FCurve *)ale->data;
+	
+	/* Ctrl-Click Usability Convenience Hack: 
+	 * For disabled F-Curves, allow access to the RNA Path 
+	 * as our "name" so that user can perform quick fixes
+	 */
+	if (fcu->flag & FCURVE_DISABLED) {
+		RNA_pointer_create(ale->id, &RNA_FCurve, ale->data, ptr);
+		*prop = RNA_struct_find_property(ptr, "data_path");
+	}
+	else {
+		/* for "normal" F-Curves - no editable name, but *prop may not be set properly yet... */
+		*prop = NULL;
+	}
+	
+	return (*prop != NULL);
+}
+
 /* check if some setting exists for this channel */
 static short acf_fcurve_setting_valid(bAnimContext *ac, bAnimListElem *ale, int setting)
 {
@@ -964,7 +989,7 @@ static bAnimChannelType ACF_FCURVE =
 	acf_generic_group_offset,       /* offset */
 
 	acf_fcurve_name,                /* name */
-	NULL,                           /* name prop */
+	acf_fcurve_name_prop,           /* name prop */
 	NULL,                           /* icon */
 
 	acf_fcurve_setting_valid,       /* has setting */
@@ -1067,7 +1092,7 @@ static int acf_filldrivers_icon(bAnimListElem *UNUSED(ale))
 
 static void acf_filldrivers_name(bAnimListElem *UNUSED(ale), char *name)
 {
-	BLI_strncpy(name, "Drivers", ANIM_CHAN_NAME_SIZE);
+	BLI_strncpy(name, IFACE_("Drivers"), ANIM_CHAN_NAME_SIZE);
 }
 
 /* check if some setting exists for this channel */
@@ -2256,7 +2281,7 @@ static void acf_shapekey_name(bAnimListElem *ale, char *name)
 		if (kb->name[0])
 			BLI_strncpy(name, kb->name, ANIM_CHAN_NAME_SIZE);
 		else
-			BLI_snprintf(name, ANIM_CHAN_NAME_SIZE, "Key %d", ale->index);
+			BLI_snprintf(name, ANIM_CHAN_NAME_SIZE, IFACE_("Key %d"), ale->index);
 	}
 }
 
@@ -3405,10 +3430,13 @@ void ANIM_channel_draw_widgets(bContext *C, bAnimContext *ac, bAnimListElem *ale
 		
 		/* if rename index matches, add widget for this */
 		if (ac->ads->renameIndex == channel_index + 1) {
-			PointerRNA ptr;
-			PropertyRNA *prop;
+			PointerRNA ptr = {{NULL}};
+			PropertyRNA *prop = NULL;
 			
-			/* draw renaming widget if we can get RNA pointer for it */
+			/* draw renaming widget if we can get RNA pointer for it 
+			 * NOTE: property may only be available in some cases, even if we have 
+			 *       a callback available (e.g. broken F-Curve rename)
+			 */
 			if (acf->name_prop(ale, &ptr, &prop)) {
 				uiBut *but;
 				

@@ -56,10 +56,12 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
 #include "node_intern.h"  /* own include */
+#include "NOD_composite.h"
 
 
 /* **************** View All Operator ************** */
@@ -196,7 +198,7 @@ typedef struct NodeViewMove {
 	int xmin, ymin, xmax, ymax;
 } NodeViewMove;
 
-static int snode_bg_viewmove_modal(bContext *C, wmOperator *op, wmEvent *event)
+static int snode_bg_viewmove_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	ARegion *ar = CTX_wm_region(C);
@@ -231,7 +233,7 @@ static int snode_bg_viewmove_modal(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
-static int snode_bg_viewmove_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int snode_bg_viewmove_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	ARegion *ar = CTX_wm_region(C);
@@ -335,6 +337,7 @@ typedef struct ImageSampleInfo {
 
 	unsigned char col[4];
 	float colf[4];
+	float linearcol[4];
 	
 	int z;
 	float zf;
@@ -353,7 +356,7 @@ static void sample_draw(const bContext *C, ARegion *ar, void *arg_info)
 
 	if (info->draw) {
 		ED_image_draw_info(scene, ar, info->color_manage, FALSE, info->channels,
-		                   info->x, info->y, info->col, info->colf,
+		                   info->x, info->y, info->col, info->colf, info->linearcol,
 		                   info->zp, info->zfp);
 	}
 }
@@ -368,7 +371,7 @@ int ED_space_node_color_sample(SpaceNode *snode, ARegion *ar, int mval[2], float
 	float fx, fy, bufx, bufy;
 	int ret = FALSE;
 
-	if (snode->treetype != NTREE_COMPOSIT || (snode->flag & SNODE_BACKDRAW) == 0) {
+	if (STREQ(snode->tree_idname, ntreeType_Composite->idname) || (snode->flag & SNODE_BACKDRAW) == 0) {
 		/* use viewer image for color sampling only if we're in compositor tree
 		 * with backdrop enabled
 		 */
@@ -413,7 +416,7 @@ int ED_space_node_color_sample(SpaceNode *snode, ARegion *ar, int mval[2], float
 	return ret;
 }
 
-static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
+static void sample_apply(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	ARegion *ar = CTX_wm_region(C);
@@ -469,7 +472,10 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 			info->colf[2] = (float)cp[2] / 255.0f;
 			info->colf[3] = (float)cp[3] / 255.0f;
 
-			info->color_manage = FALSE;
+			copy_v4_v4(info->linearcol, info->colf);
+			IMB_colormanagement_colorspace_to_scene_linear_v4(info->linearcol, false, ibuf->rect_colorspace);
+
+			info->color_manage = TRUE;
 		}
 		if (ibuf->rect_float) {
 			fp = (ibuf->rect_float + (ibuf->channels) * (y * ibuf->x + x));
@@ -513,13 +519,13 @@ static void sample_exit(bContext *C, wmOperator *op)
 	MEM_freeN(info);
 }
 
-static int sample_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int sample_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	ARegion *ar = CTX_wm_region(C);
 	ImageSampleInfo *info;
 
-	if (snode->treetype != NTREE_COMPOSIT || !(snode->flag & SNODE_BACKDRAW))
+	if (!ED_node_is_compositor(snode) || !(snode->flag & SNODE_BACKDRAW))
 		return OPERATOR_CANCELLED;
 
 	info = MEM_callocN(sizeof(ImageSampleInfo), "ImageSampleInfo");
@@ -534,7 +540,7 @@ static int sample_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
-static int sample_modal(bContext *C, wmOperator *op, wmEvent *event)
+static int sample_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	switch (event->type) {
 		case LEFTMOUSE:

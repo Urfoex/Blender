@@ -869,7 +869,7 @@ static DerivedMesh *subdivide_base(DerivedMesh *orig)
 				if (vg) {
 					vg->def_nr = dv1->dw[j].def_nr;
 					vg->w1 = dv1->dw[j].weight;
-					vg->w1 = dv2->dw[k].weight;
+					vg->w2 = dv2->dw[k].weight;
 				}
 			}
 		}
@@ -1785,7 +1785,7 @@ static DerivedMesh *base_skin(DerivedMesh *origdm,
 	totvert = origdm->getNumVerts(origdm);
 	totedge = origdm->getNumEdges(origdm);
 
-	create_vert_edge_map(&emap, &emapmem, medge, totvert, totedge);
+	BKE_mesh_vert_edge_map_create(&emap, &emapmem, medge, totvert, totedge);
 
 	emat = build_edge_mats(nodes, mvert, totvert, medge, emap, totedge);
 	skin_nodes = build_frames(mvert, totvert, nodes, emap, emat);

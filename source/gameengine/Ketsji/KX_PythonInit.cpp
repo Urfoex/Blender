@@ -371,6 +371,15 @@ static PyObject *gPyLoadGlobalDict(PyObject *)
 	Py_RETURN_NONE;
 }
 
+static char gPyGetProfileInfo_doc[] =
+"getProfileInfo()\n"
+"returns a dictionary with profiling information";
+
+static PyObject *gPyGetProfileInfo(PyObject *)
+{
+	return gp_KetsjiEngine->GetPyProfileDict();
+}
+
 static char gPySendMessage_doc[] = 
 "sendMessage(subject, [body, to, from])\n\
 sends a message in same manner as a message actuator\
@@ -858,6 +867,7 @@ static struct PyMethodDef game_methods[] = {
 	{"PrintGLInfo", (PyCFunction)pyPrintExt, METH_NOARGS, (const char *)"Prints GL Extension Info"},
 	{"PrintMemInfo", (PyCFunction)pyPrintStats, METH_NOARGS, (const char *)"Print engine statistics"},
 	{"NextFrame", (PyCFunction)gPyNextFrame, METH_NOARGS, (const char *)"Render next frame (if Python has control)"},
+	{"getProfileInfo", (PyCFunction)gPyGetProfileInfo, METH_NOARGS, gPyGetProfileInfo_doc},
 	/* library functions */
 	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS|METH_KEYWORDS, (const char *)""},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
@@ -1888,7 +1898,7 @@ PyObject *initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 	 * somehow it remembers the sys.path - Campbell
 	 */
 	static bool first_time = true;
-	char *py_path_bundle   = BLI_get_folder(BLENDER_SYSTEM_PYTHON, NULL);
+	const char * const py_path_bundle   = BLI_get_folder(BLENDER_SYSTEM_PYTHON, NULL);
 
 #if 0 // TODO - py3
 	STR_String pname = progname;
@@ -1929,14 +1939,14 @@ PyObject *initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 
 	/* mathutils types are used by the BGE even if we don't import them */
 	{
-		PyObject *mod= PyImport_ImportModuleLevel((char *)"mathutils", NULL, NULL, NULL, 0);
+		PyObject *mod = PyImport_ImportModuleLevel("mathutils", NULL, NULL, NULL, 0);
 		Py_DECREF(mod);
 	}
 
 #ifdef WITH_AUDASPACE
 	/* accessing a SoundActuator's sound results in a crash if aud is not initialized... */
 	{
-		PyObject *mod= PyImport_ImportModuleLevel((char *)"aud", NULL, NULL, NULL, 0);
+		PyObject *mod = PyImport_ImportModuleLevel("aud", NULL, NULL, NULL, 0);
 		Py_DECREF(mod);
 	}
 #endif
@@ -1993,7 +2003,7 @@ PyObject *initGamePythonScripting(const STR_String& progname, TPythonSecurityLev
 #ifdef WITH_AUDASPACE
 	/* accessing a SoundActuator's sound results in a crash if aud is not initialized... */
 	{
-		PyObject *mod= PyImport_ImportModuleLevel((char *)"aud", NULL, NULL, NULL, 0);
+		PyObject *mod= PyImport_ImportModuleLevel("aud", NULL, NULL, NULL, 0);
 		Py_DECREF(mod);
 	}
 #endif

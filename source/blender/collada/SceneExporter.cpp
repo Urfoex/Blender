@@ -36,7 +36,12 @@ SceneExporter::SceneExporter(COLLADASW::StreamWriter *sw, ArmatureExporter *arm,
 	: COLLADASW::LibraryVisualScenes(sw), arm_exporter(arm), export_settings(export_settings)
 {
 }
-	
+
+void SceneExporter::setExportTransformationType(BC_export_transformation_type transformation_type)
+{
+	this->transformation_type = transformation_type;
+}
+
 void SceneExporter::exportScene(Scene *sce)
 {
 	// <library_visual_scenes> <visual_scene>
@@ -84,6 +89,7 @@ void SceneExporter::exportHierarchy(Scene *sce)
 	}
 }
 
+
 void SceneExporter::writeNodes(Object *ob, Scene *sce)
 {
 	// Add associated armature first if available
@@ -130,8 +136,9 @@ void SceneExporter::writeNodes(Object *ob, Scene *sce)
 	if (ob->type == OB_MESH && armature_exported)
 		// for skinned mesh we write obmat in <bind_shape_matrix>
 		TransformWriter::add_node_transform_identity(colladaNode);
-	else
-		TransformWriter::add_node_transform_ob(colladaNode, ob);
+	else {
+		TransformWriter::add_node_transform_ob(colladaNode, ob, this->transformation_type);
+	}
 
 	// <instance_geometry>
 	if (ob->type == OB_MESH) {
@@ -171,7 +178,7 @@ void SceneExporter::writeNodes(Object *ob, Scene *sce)
 		if ((ob->transflag & OB_DUPLIGROUP) == OB_DUPLIGROUP && ob->dup_group) {
 			GroupObject *go = NULL;
 			Group *gr = ob->dup_group;
-			/* printf("group detected '%s'\n", gr->id.name+2); */
+			/* printf("group detected '%s'\n", gr->id.name + 2); */
 			for (go = (GroupObject *)(gr->gobject.first); go; go = go->next) {
 				printf("\t%s\n", go->ob->id.name);
 			}
@@ -183,7 +190,7 @@ void SceneExporter::writeNodes(Object *ob, Scene *sce)
 	}
 
 	if (ob->constraints.first != NULL ) {
-		bConstraint *con = (bConstraint*) ob->constraints.first;
+		bConstraint *con = (bConstraint *) ob->constraints.first;
 		while (con) {
 			std::string con_name(id_name(con));
 			std::string con_tag = con_name + "_constraint";
@@ -209,7 +216,7 @@ void SceneExporter::writeNodes(Object *ob, Scene *sce)
 			
 				cti->get_constraint_targets(con, &targets);
 				if (cti) {
-					for (ct = (bConstraintTarget*)targets.first; ct; ct = ct->next) {
+					for (ct = (bConstraintTarget *)targets.first; ct; ct = ct->next) {
 						obtar = ct->tar;
 						std::string tar_id(id_name(obtar));
 						colladaNode.addExtraTechniqueChildParameter("blender",con_tag,"target_id",tar_id);

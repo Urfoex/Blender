@@ -294,7 +294,7 @@ static void build_mesh_leaf_node(PBVH *bvh, PBVHNode *node)
 
 	/* Build the vertex list, unique verts first */
 	for (iter = BLI_ghashIterator_new(map), i = 0;
-	     BLI_ghashIterator_isDone(iter) == FALSE;
+	     BLI_ghashIterator_notDone(iter);
 	     BLI_ghashIterator_step(iter), ++i)
 	{
 		void *value = BLI_ghashIterator_getValue(iter);
@@ -1057,10 +1057,10 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					                           node->prim_indices,
 					                           node->totprim);
 					break;
- 				case PBVH_BMESH:
+				case PBVH_BMESH:
 					node->draw_buffers =
-						GPU_build_bmesh_buffers(bvh->flags &
-							                    PBVH_DYNTOPO_SMOOTH_SHADING);
+					    GPU_build_bmesh_buffers(bvh->flags &
+					                            PBVH_DYNTOPO_SMOOTH_SHADING);
 					break;
 			}
  
@@ -1089,12 +1089,12 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					                        node->face_vert_indices,
 					                        bvh->show_diffuse_color);
 					break;
- 				case PBVH_BMESH:
+				case PBVH_BMESH:
 					GPU_update_bmesh_buffers(node->draw_buffers,
-		                                     bvh->bm,
-											 node->bm_faces,
-											 node->bm_unique_verts,
-											 node->bm_other_verts);
+					                         bvh->bm,
+					                         node->bm_faces,
+					                         node->bm_unique_verts,
+					                         node->bm_other_verts);
 					break;
 			}
 
@@ -1217,7 +1217,7 @@ void BKE_pbvh_get_grid_updates(PBVH *bvh, int clear, void ***gridfaces, int *tot
 	faces = MEM_callocN(sizeof(void *) * tot, "PBVH Grid Faces");
 
 	for (hiter = BLI_ghashIterator_new(map), i = 0;
-	     !BLI_ghashIterator_isDone(hiter);
+	     BLI_ghashIterator_notDone(hiter);
 	     BLI_ghashIterator_step(hiter), ++i)
 	{
 		faces[i] = BLI_ghashIterator_getKey(hiter);

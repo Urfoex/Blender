@@ -29,8 +29,11 @@ import re
 import struct
 import sys
 import tempfile
+#import time
 
-from bl_i18n_utils import settings, rtl_utils
+from bl_i18n_utils import (settings,
+                           utils_rtl,
+                          )
 
 import bpy
 
@@ -257,15 +260,23 @@ class I18nMessage:
     @classmethod
     def do_escape(cls, txt):
         """Replace some chars by their escaped versions!"""
-        txt = txt.replace("\n", "\\n").replace("\t", "\\t")
-        txt = cls._esc_quotes.sub(r'\1\"', txt)
+        if "\n" in txt:
+            txt = txt.replace("\n", r"\n")
+        if "\t" in txt:
+            txt.replace("\t", r"\t")
+        if '"' in txt:
+            txt = cls._esc_quotes.sub(r'\1\"', txt)
         return txt
 
     @classmethod
     def do_unescape(cls, txt):
         """Replace escaped chars by real ones!"""
-        txt = txt.replace("\\n", "\n").replace("\\t", "\t")
-        txt = cls._unesc_quotes.sub(r'\1"', txt)
+        if r"\n" in txt:
+            txt = txt.replace(r"\n", "\n")
+        if r"\t" in txt:
+            txt = txt.replace(r"\t", "\t")
+        if r'\"' in txt:
+            txt = cls._unesc_quotes.sub(r'\1"', txt)
         return txt
 
     def escape(self, do_all=False):
@@ -277,8 +288,6 @@ class I18nMessage:
         names = self._esc_names_all if do_all else self._esc_names
         for name in names:
             setattr(self, name, [self.do_unescape(l) for l in getattr(self, name)])
-            if None in getattr(self, name):
-                print(getattr(self, name))
 
 
 class I18nMessages:
@@ -395,7 +404,7 @@ class I18nMessages:
         for k, m in self.msgs.items():
             keys.append(k)
             trans.append(m.msgstr)
-        trans = rtl_utils.log2vis(trans, self.settings)
+        trans = utils_rtl.log2vis(trans, self.settings)
         for k, t in zip(keys, trans):
             self.msgs[k].msgstr = t
 

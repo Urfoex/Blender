@@ -36,6 +36,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_path_util.h"
 #include "BLI_array.h"
 #include "BLI_math.h"
@@ -158,7 +159,7 @@ static void delete_customdata_layer(bContext *C, Object *ob, CustomDataLayer *la
 	}
 	else {
 		CustomData_free_layer_active(data, type, tot);
-		mesh_update_customdata_pointers(me, TRUE);
+		BKE_mesh_update_customdata_pointers(me, true);
 	}
 
 	if (!CustomData_has_layer(data, type) && (type == CD_MLOOPCOL && (ob->mode & OB_MODE_VERTEX_PAINT)))
@@ -405,7 +406,7 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 			CustomData_set_layer_active(&me->fdata, CD_MTFACE, layernum_dst);
 		}
 
-		mesh_update_customdata_pointers(me, TRUE);
+		BKE_mesh_update_customdata_pointers(me, true);
 	}
 
 	/* don't overwrite our copied coords */
@@ -488,7 +489,7 @@ int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mes
 			CustomData_set_layer_active(&me->fdata, CD_MCOL, layernum);
 		}
 
-		mesh_update_customdata_pointers(me, TRUE);
+		BKE_mesh_update_customdata_pointers(me, true);
 	}
 
 	DAG_id_tag_update(&me->id, 0);
@@ -570,7 +571,7 @@ void MESH_OT_uv_texture_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int drop_named_image_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
@@ -884,7 +885,7 @@ void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges, int calc_tessface)
 	}
 
 	if (calc_edges || ((mesh->totpoly || mesh->totface) && mesh->totedge == 0))
-		BKE_mesh_calc_edges(mesh, calc_edges);
+		BKE_mesh_calc_edges(mesh, calc_edges, true);
 
 	if (calc_tessface) {
 		if (tessface_input == FALSE) {
@@ -941,7 +942,7 @@ static void mesh_add_verts(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->vdata, mesh->totvert);
 	mesh->vdata = vdata;
-	mesh_update_customdata_pointers(mesh, FALSE);
+	BKE_mesh_update_customdata_pointers(mesh, false);
 
 	/* scan the input list and insert the new vertices */
 
@@ -985,7 +986,7 @@ static void mesh_add_edges(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->edata, mesh->totedge);
 	mesh->edata = edata;
-	mesh_update_customdata_pointers(mesh, FALSE); /* new edges don't change tessellation */
+	BKE_mesh_update_customdata_pointers(mesh, false); /* new edges don't change tessellation */
 
 	/* set default flags */
 	medge = &mesh->medge[mesh->totedge];
@@ -1015,7 +1016,7 @@ static void mesh_add_tessfaces(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->fdata, mesh->totface);
 	mesh->fdata = fdata;
-	mesh_update_customdata_pointers(mesh, TRUE);
+	BKE_mesh_update_customdata_pointers(mesh, true);
 
 	/* set default flags */
 	mface = &mesh->mface[mesh->totface];
@@ -1044,7 +1045,7 @@ static void mesh_add_loops(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->ldata, mesh->totloop);
 	mesh->ldata = ldata;
-	mesh_update_customdata_pointers(mesh, TRUE);
+	BKE_mesh_update_customdata_pointers(mesh, true);
 
 	mesh->totloop = totloop;
 }
@@ -1069,7 +1070,7 @@ static void mesh_add_polys(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->pdata, mesh->totpoly);
 	mesh->pdata = pdata;
-	mesh_update_customdata_pointers(mesh, TRUE);
+	BKE_mesh_update_customdata_pointers(mesh, true);
 
 	/* set default flags */
 	mpoly = &mesh->mpoly[mesh->totpoly];

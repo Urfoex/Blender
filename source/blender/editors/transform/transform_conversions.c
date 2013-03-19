@@ -223,7 +223,9 @@ static void set_prop_dist(TransInfo *t, short with_dist)
 						tob->rdist = dist;
 					}
 				}
-				else break;  // by definition transdata has selected items in beginning
+				else {
+					break;  /* by definition transdata has selected items in beginning */
+				}
 			}
 			if (with_dist) {
 				tob->dist = tob->rdist;
@@ -1291,7 +1293,7 @@ static void calc_distanceCurveVerts(TransData *head, TransData *tail)
 			}
 		}
 		else {
-			td->dist = MAXFLOAT;
+			td->dist = FLT_MAX;
 			td->flag |= TD_NOTCONNECTED;
 		}
 	}
@@ -1857,7 +1859,7 @@ static void editmesh_set_connectivity_distance(BMEditMesh *em, float mtx[3][3], 
 }
 
 /* loop-in-a-loop I know, but we need it! (ton) */
-static void get_face_center(float cent_r[3], BMVert *eve)
+static void get_face_center(float r_cent[3], BMVert *eve)
 
 {
 	BMFace *efa;
@@ -1865,20 +1867,20 @@ static void get_face_center(float cent_r[3], BMVert *eve)
 
 	BM_ITER_ELEM (efa, &iter, eve, BM_FACES_OF_VERT) {
 		if (BM_elem_flag_test(efa, BM_ELEM_SELECT)) {
-			BM_face_calc_center_mean(efa, cent_r);
+			BM_face_calc_center_mean(efa, r_cent);
 			break;
 		}
 	}
 }
 
-static void get_edge_center(float cent_r[3], BMVert *eve)
+static void get_edge_center(float r_cent[3], BMVert *eve)
 {
 	BMEdge *eed;
 	BMIter iter;
 
 	BM_ITER_ELEM (eed, &iter, eve, BM_EDGES_OF_VERT) {
 		if (BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
-			mid_v3_v3v3(cent_r, eed->v1->co, eed->v2->co);
+			mid_v3_v3v3(r_cent, eed->v1->co, eed->v2->co);
 			break;
 		}
 	}
@@ -2048,7 +2050,9 @@ static void createTransEditVerts(TransInfo *t)
 		if (propmode & T_PROP_CONNECTED)
 			dists = MEM_mallocN(em->bm->totvert * sizeof(float), "scratch nears");
 	}
-	else t->total = countsel;
+	else {
+		t->total = countsel;
+	}
 
 	tob = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Mesh EditMode)");
 	if (ELEM(t->mode, TFM_SKIN_RESIZE, TFM_SHRINKFATTEN)) {
@@ -2127,7 +2131,7 @@ static void createTransEditVerts(TransInfo *t)
 					}
 					else {
 						tob->flag |= TD_NOTCONNECTED;
-						tob->dist = MAXFLOAT;
+						tob->dist = FLT_MAX;
 					}
 				}
 
@@ -2363,7 +2367,7 @@ static void UVsToTransData(SpaceImage *sima, TransData *td, TransData2D *td2d, f
 		td->dist = 0.0;
 	}
 	else {
-		td->dist = MAXFLOAT;
+		td->dist = FLT_MAX;
 	}
 	unit_m3(td->mtx);
 	unit_m3(td->smtx);
@@ -3500,7 +3504,7 @@ static void bezt_to_transdata(TransData *td, TransData2D *td2d, AnimData *adt, B
 		td->dist = 0.0f;
 	}
 	else
-		td->dist = MAXFLOAT;
+		td->dist = FLT_MAX;
 	
 	if (ishandle)
 		td->flag |= TD_NOTIMESNAP;
@@ -3584,7 +3588,9 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 				if (ELEM3(t->mode, TFM_TRANSLATION, TFM_TIME_TRANSLATE, TFM_TIME_SLIDE)) {
 					/* for 'normal' pivots - just include anything that is selected.
 					 * this works a bit differently in translation modes */
-					if (sel2) count++;
+					if (sel2) {
+						count++;
+					}
 					else {
 						if (sel1) count++;
 						if (sel3) count++;
@@ -6594,7 +6600,7 @@ void createTransData(bContext *C, TransInfo *t)
 			sort_trans_data_dist(t);
 		}
 	}
-	else if (ob && (ob->mode & (OB_MODE_SCULPT | OB_MODE_TEXTURE_PAINT))) {
+	else if (ob && (ob->mode & (OB_MODE_ALL_PAINT))) {
 		/* sculpt mode and project paint have own undo stack
 		 * transform ops redo clears sculpt/project undo stack.
 		 *

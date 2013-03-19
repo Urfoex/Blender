@@ -33,7 +33,7 @@ import os
 from check_style_c_config import IGNORE, IGNORE_DIR, SOURCE_DIR
 IGNORE = tuple([os.path.join(SOURCE_DIR, ig) for ig in IGNORE])
 IGNORE_DIR = tuple([os.path.join(SOURCE_DIR, ig) for ig in IGNORE_DIR])
-
+WARN_TEXT = False
 
 def is_ignore(f):
     for ig in IGNORE:
@@ -49,11 +49,7 @@ print("Scanning:", SOURCE_DIR)
 # TODO
 #
 # Add checks for:
-# - space around operators
 # - macro brace use
-# - spaces around brackets with function call: func(args)
-# - braces with function definitions
-# - braces with typedefs
 # - line length - in a not-too-annoying way
 #   (allow for long arrays in struct definitions, PyMethodDef for eg)
 
@@ -132,6 +128,13 @@ def tk_advance_line_start(index):
     while tokens[index].line == tokens[index - 1].line and index > 0:
         index -= 1
     return tk_advance_no_ws(index, 1)
+
+
+def tk_advance_line(index, direction):
+    line = tokens[index].line
+    while tokens[index + direction].line == line or tokens[index].text == "\n":
+        index += direction
+    return index
 
 
 def tk_match_backet(index):
@@ -283,6 +286,8 @@ def warning(message, index_kw_start, index_kw_end):
         print("%s\t%d\t%s\t%s" % (filepath, tokens[index_kw_start].line, "comment", message))
     else:
         print("%s:%d: warning: %s" % (filepath, tokens[index_kw_start].line, message))
+        if WARN_TEXT:
+            print("".join([tokens[i].text for i in range(index_kw_start, index_kw_end + 1)]))
 
 
 def warning_lineonly(message, line):
@@ -320,6 +325,13 @@ def blender_check_kw_if(index_kw_start, index_kw, index_kw_end):
         # no '{' on a multi-line if
         if tokens[index_kw].line != tokens[index_kw_end].line:
             warning("multi-line if should use a brace '%s (\\n\\n) statement;'" % tokens[index_kw].text, index_kw, index_kw_end)
+
+    # check for: if (a &&
+    #                b) { ...
+    # brace should be on a newline.
+    if (tokens[index_kw].line != tokens[index_kw_end].line):
+        if tokens[index_kw_end].line == tokens[index_next].line:
+            warning("multi-line should use a on a new line '%s (\\n\\n) {'" % tokens[index_kw].text, index_kw, index_kw_end)
 
     # check for: if () { ... };
     #
@@ -359,10 +371,20 @@ def blender_check_kw_else(index_kw):
     # else
     # {
     # ... which is never OK
+    #
+    # ... except if you have
+    # else
+    # #preprocessor
+    # {
 
     if tokens[i_next].type == Token.Punctuation and tokens[i_next].text == "{":
         if tokens[index_kw].line < tokens[i_next].line:
-            warning("else body brace on a new line 'else\\n{'", index_kw, i_next)
+            # check for preproc
+            i_newline = tk_advance_line(index_kw, 1)
+            if tokens[i_newline].text.startswith("#"):
+                pass
+            else:
+                warning("else body brace on a new line 'else\\n{'", index_kw, i_next)
 
     # this check only tests for:
     # else
@@ -523,6 +545,10 @@ def blender_check_operator(index_start, index_end, op_text, is_cpp):
         pass  # *a = b
     elif len(op_text) == 1 and op_text[0] == "-" and tokens[index_start + 1].text.isspace() is False:
         pass  # -1
+    elif len(op_text) == 2 and op_text == "++" and tokens[index_start + 1].text.isspace() is False:
+        pass  # ++a
+    elif len(op_text) == 2 and op_text == "--" and tokens[index_start + 1].text.isspace() is False:
+        pass  # --a
     elif len(op_text) == 1 and op_text[0] == "&":
         # if (a &&
         #     &b)
@@ -813,18 +839,18 @@ if __name__ == "__main__":
     import sys
     import os
 
-    if 0:
-        SOURCE_DIR = os.path.normpath(os.path.abspath(os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))))
-        #scan_source_recursive(os.path.join(SOURCE_DIR, "source", "blender", "bmesh"))
-        scan_source_recursive(os.path.join(SOURCE_DIR, "source", "blender", "modifiers"))
-        sys.exit(0)
-
     desc = 'Check C/C++ code for conformance with blenders style guide:\nhttp://wiki.blender.org/index.php/Dev:Doc/CodeStyle)'
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("paths", nargs='+', help="list of files or directories to check")
     parser.add_argument("-l", "--no-length-check", action="store_true",
                         help="skip warnings for long lines")
     args = parser.parse_args()
+
+    if 0:
+        SOURCE_DIR = os.path.normpath(os.path.abspath(os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))))
+        #scan_source_recursive(os.path.join(SOURCE_DIR, "source", "blender", "bmesh"))
+        scan_source_recursive(os.path.join(SOURCE_DIR, "source/blender/makesrna/intern"), args)
+        sys.exit(0)
 
     for filepath in args.paths:
         if os.path.isdir(filepath):

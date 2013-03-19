@@ -198,7 +198,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 	clear_matcopybuf();
 	ED_render_clear_mtex_copybuf();
 
-	//	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+	// glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		
 	ED_preview_init_dbase();
 	
@@ -449,6 +449,7 @@ void WM_exit_ext(bContext *C, const short do_python)
 
 #ifdef WITH_INTERNATIONAL
 	BLF_free_unifont();
+	BLF_free_unifont_mono();
 	BLF_lang_free();
 #endif
 	

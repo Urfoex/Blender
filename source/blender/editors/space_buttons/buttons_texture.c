@@ -113,7 +113,7 @@ static void buttons_texture_users_find_nodetree(ListBase *users, ID *id,
 {
 	bNode *node;
 
-	if (ntree) {
+	if (ntreeIsValid(ntree)) {
 		for (node = ntree->nodes.first; node; node = node->next) {
 			if (node->typeinfo->nclass == NODE_CLASS_TEXTURE) {
 				PointerRNA ptr;
@@ -404,7 +404,7 @@ void uiTemplateTextureUser(uiLayout *layout, bContext *C)
 	}
 
 	/* create button */
-	BLI_snprintf(name, UI_MAX_NAME_STR, "%s", user->name);
+	BLI_strncpy(name, user->name, UI_MAX_NAME_STR);
 
 	if (user->icon) {
 		but = uiDefIconTextMenuBut(block, template_texture_user_menu, NULL,

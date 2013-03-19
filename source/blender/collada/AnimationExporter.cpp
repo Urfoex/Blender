@@ -36,9 +36,10 @@ void forEachObjectInExportSet(Scene *sce, Functor &f, LinkNode *export_set)
 	}
 }
 
-void AnimationExporter::exportAnimations(Scene *sce)
+bool AnimationExporter::exportAnimations(Scene *sce)
 {
-	if (hasAnimations(sce)) {
+	bool has_animations = hasAnimations(sce);
+	if (has_animations) {
 		this->scene = sce;
 
 		openLibrary();
@@ -47,6 +48,7 @@ void AnimationExporter::exportAnimations(Scene *sce)
 
 		closeLibrary();
 	}
+	return has_animations;
 }
 
 // called for each exported object
@@ -182,7 +184,7 @@ void AnimationExporter::make_anim_frames_from_targets(Object *ob, std::vector<fl
 	ListBase *conlist = get_active_constraints(ob);
 	if (conlist == NULL) return;
 	bConstraint *con;
-	for (con = (bConstraint*)conlist->first; con; con = con->next) {
+	for (con = (bConstraint *)conlist->first; con; con = con->next) {
 		ListBase targets = {NULL, NULL};
 		
 		bConstraintTypeInfo *cti = BKE_constraint_get_typeinfo(con);
@@ -198,7 +200,7 @@ void AnimationExporter::make_anim_frames_from_targets(Object *ob, std::vector<fl
 			 */
 			cti->get_constraint_targets(con, &targets);
 			if (cti) {
-				for (ct = (bConstraintTarget*)targets.first; ct; ct = ct->next) {
+				for (ct = (bConstraintTarget *)targets.first; ct; ct = ct->next) {
 					obtar = ct->tar;
 					find_frames(obtar, frames);
 				}
@@ -257,6 +259,12 @@ std::string AnimationExporter::getObjectBoneName(Object *ob, const FCurve *fcu)
 		return id_name(ob);
 }
 
+std::string AnimationExporter::getAnimationPathId(const FCurve *fcu)
+{
+	std::string rna_path = std::string(fcu->rna_path);
+	return translate_id(rna_path);
+}
+
 //convert f-curves to animation curves and write
 void AnimationExporter::dae_animation(Object *ob, FCurve *fcu, char *transformName, bool is_param, Material *ma)
 {
@@ -303,16 +311,27 @@ void AnimationExporter::dae_animation(Object *ob, FCurve *fcu, char *transformNa
 	//Create anim Id
 	if (ob->type == OB_ARMATURE) {
 		ob_name =  getObjectBoneName(ob, fcu);
-		BLI_snprintf(anim_id, sizeof(anim_id), "%s_%s.%s", (char *)translate_id(ob_name).c_str(),
-		             transformName, axis_name);
+		BLI_snprintf(
+				anim_id,
+				sizeof(anim_id),
+				"%s_%s.%s",
+				(char *)translate_id(ob_name).c_str(),
+				(char *)translate_id(transformName).c_str(),
+				axis_name);
 	}
 	else {
 		if (ma)
 			ob_name = id_name(ob) + "_material";
 		else
 			ob_name = id_name(ob);
-		BLI_snprintf(anim_id, sizeof(anim_id), "%s_%s_%s", (char *)translate_id(ob_name).c_str(),
-		             fcu->rna_path, axis_name);
+
+		BLI_snprintf(
+				anim_id,
+				sizeof(anim_id),
+				"%s_%s_%s",
+				(char *)translate_id(ob_name).c_str(),
+				(char *)getAnimationPathId(fcu).c_str(),
+				axis_name);
 	}
 
 	openAnimation(anim_id, COLLADABU::Utils::EMPTY_STRING);
@@ -525,7 +544,7 @@ void AnimationExporter::dae_baked_object_animation(std::vector<float> &fra, Obje
 	if (!fra.size())
 		return;
 
-	BLI_snprintf(anim_id, sizeof(anim_id), "%s_%s", (char*)translate_id(ob_name).c_str(),
+	BLI_snprintf(anim_id, sizeof(anim_id), "%s_%s", (char *)translate_id(ob_name).c_str(),
 	             "object_matrix");
 
 	openAnimation(anim_id, COLLADABU::Utils::EMPTY_STRING);
@@ -882,7 +901,7 @@ std::string AnimationExporter::create_source_from_vector(COLLADASW::InputSemanti
 }
 
 
-std::string AnimationExporter::create_4x4_source(std::vector<float> &frames, Object * ob, Bone *bone, const std::string& anim_id)
+std::string AnimationExporter::create_4x4_source(std::vector<float> &frames, Object *ob, Bone *bone, const std::string &anim_id)
 {
 	COLLADASW::InputSemantic::Semantics semantic = COLLADASW::InputSemantic::OUTPUT;
 	std::string source_id = anim_id + get_semantic_suffix(semantic);
@@ -1516,7 +1535,7 @@ void AnimationExporter::calc_ob_mat_at_time(Object *ob, float ctime , float mat[
 {
 	ListBase *conlist = get_active_constraints(ob);
 	bConstraint *con;
-	for (con = (bConstraint*)conlist->first; con; con = con->next) {
+	for (con = (bConstraint *)conlist->first; con; con = con->next) {
 		ListBase targets = {NULL, NULL};
 		
 		bConstraintTypeInfo *cti = BKE_constraint_get_typeinfo(con);
@@ -1525,7 +1544,7 @@ void AnimationExporter::calc_ob_mat_at_time(Object *ob, float ctime , float mat[
 			bConstraintTarget *ct;
 			Object *obtar;
 			cti->get_constraint_targets(con, &targets);
-			for (ct = (bConstraintTarget*)targets.first; ct; ct = ct->next) {
+			for (ct = (bConstraintTarget *)targets.first; ct; ct = ct->next) {
 				obtar = ct->tar;
 				BKE_animsys_evaluate_animdata(scene, &obtar->id, obtar->adt, ctime, ADT_RECALC_ANIM);
 				BKE_object_where_is_calc_time(scene, obtar, ctime);

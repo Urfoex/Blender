@@ -28,10 +28,18 @@
  *  \ingroup RNA
  */
 
-
 #include <stdlib.h>
 
 #include "MEM_guardedalloc.h"
+
+#include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_object_types.h"
+
+#include "BLI_array.h"
+#include "BLI_math_base.h"
+#include "BLI_math_rotation.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -39,16 +47,7 @@
 
 #include "rna_internal.h"
 
-#include "DNA_material_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_object_types.h"
-
 #include "WM_types.h"
-
-#include "BLI_array.h"
-#include "BLI_math_base.h"
-#include "BLI_math_rotation.h"
 
 #ifdef RNA_RUNTIME
 
@@ -529,7 +528,7 @@ static void rna_CustomDataLayer_active_set(PointerRNA *ptr, CustomData *data, in
 		else CustomData_set_layer_active(ldata, CD_MLOOPUV, n);
 	}
 
-	mesh_update_customdata_pointers(me, TRUE);
+	BKE_mesh_update_customdata_pointers(me, true);
 }
 
 static void rna_CustomDataLayer_clone_set(PointerRNA *ptr, CustomData *data, int value, int type, int render)
@@ -552,7 +551,7 @@ DEFINE_CUSTOMDATA_LAYER_COLLECTION_ACTIVEITEM(uv_layer, ldata, CD_MLOOPUV, rende
 
 /* MeshUVLoopLayer */
 
-static char *rna_MeshUVLoopLayer_path(PointerRNA * ptr)
+static char *rna_MeshUVLoopLayer_path(PointerRNA *ptr)
 {
 	return BLI_sprintfN("uv_layers[\"%s\"]", ((CustomDataLayer *)ptr->data)->name);
 }

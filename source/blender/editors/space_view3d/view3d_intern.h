@@ -101,12 +101,15 @@ void VIEW3D_OT_clear_render_border(struct wmOperatorType *ot);
 void VIEW3D_OT_zoom_border(struct wmOperatorType *ot);
 
 void view3d_boxview_copy(ScrArea *sa, ARegion *ar);
-void ndof_to_quat(struct wmNDOFMotionData *ndof, float q[4]);
-float ndof_to_axis_angle(struct wmNDOFMotionData *ndof, float axis[3]);
+void ndof_to_quat(const struct wmNDOFMotionData *ndof, float q[4]);
+float ndof_to_axis_angle(const struct wmNDOFMotionData *ndof, float axis[3]);
 
 /* view3d_fly.c */
 void view3d_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_fly(struct wmOperatorType *ot);
+
+/* view3d_ruler.c */
+void VIEW3D_OT_ruler(struct wmOperatorType *ot);
 
 /* drawanim.c */
 void draw_motion_paths_init(View3D *v3d, struct ARegion *ar);
@@ -149,7 +152,7 @@ void draw_mesh_paint(View3D *v3d, RegionView3D *rv3d,
 
 /* view3d_draw.c */
 void view3d_main_area_draw(const struct bContext *C, struct ARegion *ar);
-void draw_depth(Scene *scene, struct ARegion *ar, View3D *v3d, int (*func)(void *));
+void draw_depth(Scene *scene, struct ARegion *ar, View3D *v3d, int (*func)(void *), bool alphaoverride);
 void draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d);
 void ED_view3d_after_add(ListBase *lb, Base *base, const short dflag);
 

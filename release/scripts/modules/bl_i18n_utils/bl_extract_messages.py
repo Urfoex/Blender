@@ -30,7 +30,7 @@ import re
 import sys
 
 # XXX Relative import does not work here when used from Blender...
-from bl_i18n_utils import settings as i18n_settings, utils
+from bl_i18n_utils import settings as settings_i18n, utils
 
 import bpy
 
@@ -43,10 +43,10 @@ filter_message = ignore_reg.match
 
 def init_spell_check(settings, lang="en_US"):
     try:
-        from bl_i18n_utils import spell_check_utils
-        return spell_check_utils.SpellChecker(settings, lang)
+        from bl_i18n_utils import utils_spell_check
+        return utils_spell_check.SpellChecker(settings, lang)
     except Exception as e:
-        print("Failed to import spell_check_utils ({})".format(str(e)))
+        print("Failed to import utils_spell_check ({})".format(str(e)))
         return None
 
 
@@ -242,7 +242,7 @@ def dump_messages_rna(msgs, reports, settings):
     def class_blacklist():
         blacklist_rna_class = [
             # core classes
-            "Context", "Event", "Function", "UILayout", "BlendData", "UnknownType",
+            "Context", "Event", "Function", "UILayout", "UnknownType",
             # registerable classes
             "Panel", "Menu", "Header", "RenderEngine", "Operator", "OperatorMacro", "Macro", "KeyingSetInfo",
             # window classes
@@ -356,6 +356,8 @@ def dump_messages_rna(msgs, reports, settings):
 
         if bl_rna.description:
             process_msg(msgs, default_context, bl_rna.description, msgsrc, reports, check_ctxt_rna_tip, settings)
+        elif cls.__doc__:  # XXX Some classes (like KeyingSetInfo subclasses) have void description... :(
+            process_msg(msgs, default_context, cls.__doc__, msgsrc, reports, check_ctxt_rna_tip, settings)
 
         if hasattr(bl_rna, 'bl_label') and  bl_rna.bl_label:
             process_msg(msgs, msgctxt, bl_rna.bl_label, msgsrc, reports, check_ctxt_rna, settings)
@@ -503,6 +505,7 @@ def dump_py_messages_from_files(msgs, reports, files, settings):
                 ),
         "msgid": ((("msgctxt",), _ctxt_to_ctxt),
                  ),
+        "message": (),
     }
 
     context_kw_set = {}
@@ -538,6 +541,12 @@ def dump_py_messages_from_files(msgs, reports, files, settings):
                 for msgid, msgctxts in context_kw_set.items():
                     if arg_kw in msgctxts:
                         func_translate_args[func_id][msgid][1][arg_kw] = arg_pos
+    # The report() func of operators.
+    for func_id, func in bpy.types.Operator.bl_rna.functions.items():
+        # check it has one or more arguments as defined in translate_kw
+        for arg_pos, (arg_kw, arg) in enumerate(func.parameters.items()):
+            if ((arg_kw in translate_kw) and (not arg.is_output) and (arg.type == 'STRING')):
+                func_translate_args.setdefault(func_id, {})[arg_kw] = (arg_pos, {})
     # We manually add funcs from bpy.app.translations
     for func_id, func_ids in pgettext_variants:
         func_translate_args[func_id] = pgettext_variants_args
@@ -788,9 +797,7 @@ def dump_messages(do_messages, do_checks, settings):
     dump_src_messages(msgs, reports, settings)
 
     # Get strings from addons' categories.
-    print("foo, bar", bpy.types.WindowManager.addon_filter[1]['items'](bpy.context.window_manager, bpy.context))
     for uid, label, tip in bpy.types.WindowManager.addon_filter[1]['items'](bpy.context.window_manager, bpy.context):
-        print(uid, label, tip)
         process_msg(msgs, settings.DEFAULT_CONTEXT, label, "Addons' categories", reports, None, settings)
         if tip:
             process_msg(msgs, settings.DEFAULT_CONTEXT, tip, "Addons' categories", reports, None, settings)
@@ -894,7 +901,7 @@ def main():
                         help="Override (some) default settings. Either a JSon file name, or a JSon string.")
     args = parser.parse_args()
 
-    settings = i18n_settings.I18nSettings()
+    settings = settings_i18n.I18nSettings()
     settings.from_json(args.settings)
 
     if args.output:

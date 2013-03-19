@@ -148,7 +148,7 @@ void default_color_mapping(ColorMapping *colormap)
 {
 	memset(colormap, 0, sizeof(ColorMapping));
 
-	init_colorband(&colormap->coba, 1);
+	init_colorband(&colormap->coba, true);
 
 	colormap->bright = 1.0;
 	colormap->contrast = 1.0;
@@ -163,7 +163,7 @@ void default_color_mapping(ColorMapping *colormap)
 
 /* ****************** COLORBAND ******************* */
 
-void init_colorband(ColorBand *coba, int rangetype)
+void init_colorband(ColorBand *coba, bool rangetype)
 {
 	int a;
 	
@@ -205,7 +205,7 @@ void init_colorband(ColorBand *coba, int rangetype)
 	
 }
 
-ColorBand *add_colorband(int rangetype)
+ColorBand *add_colorband(bool rangetype)
 {
 	ColorBand *coba;
 	
@@ -256,7 +256,9 @@ int do_colorband(const ColorBand *coba, float in, float out[4])
 				left.pos = 0.0f;
 				cbd2 = &left;
 			}
-			else cbd2 = cbd1 - 1;
+			else {
+				cbd2 = cbd1 - 1;
+			}
 			
 			if (in >= cbd1->pos && coba->ipotype < 2) {
 				out[0] = cbd1->r;
@@ -440,7 +442,7 @@ void default_tex(Tex *tex)
 	tex->type = TEX_CLOUDS;
 	tex->stype = 0;
 	tex->flag = TEX_CHECKER_ODD;
-	tex->imaflag = TEX_INTERPOL | TEX_MIPMAP;
+	tex->imaflag = TEX_INTERPOL | TEX_MIPMAP | TEX_USEALPHA;
 	tex->extend = TEX_REPEAT;
 	tex->cropxmin = tex->cropymin = 0.0;
 	tex->cropxmax = tex->cropymax = 1.0;
@@ -693,7 +695,7 @@ Tex *BKE_texture_copy(Tex *tex)
 
 	if (tex->nodetree) {
 		if (tex->nodetree->execdata) {
-			ntreeTexEndExecTree(tex->nodetree->execdata, 1);
+			ntreeTexEndExecTree(tex->nodetree->execdata);
 		}
 		texn->nodetree = ntreeCopyTree(tex->nodetree);
 	}
@@ -911,15 +913,18 @@ void autotexname(Tex *tex)
 		else if (tex->type == TEX_IMAGE) {
 			ima = tex->ima;
 			if (ima) {
-				BLI_strncpy(di, ima->name, sizeof(di));
-				BLI_splitdirstring(di, fi);
+				BLI_split_file_part(ima->name, fi, sizeof(fi));
 				strcpy(di, "I.");
 				strcat(di, fi);
 				new_id(&bmain->tex, (ID *)tex, di);
 			}
-			else new_id(&bmain->tex, (ID *)tex, texstr[tex->type]);
+			else {
+				new_id(&bmain->tex, (ID *)tex, texstr[tex->type]);
+			}
 		}
-		else new_id(&bmain->tex, (ID *)tex, texstr[tex->type]);
+		else {
+			new_id(&bmain->tex, (ID *)tex, texstr[tex->type]);
+		}
 	}
 }
 #endif
@@ -1280,7 +1285,7 @@ PointDensity *BKE_add_pointdensity(void)
 	pd->noise_depth = 1;
 	pd->noise_fac = 1.0f;
 	pd->noise_influence = TEX_PD_NOISE_STATIC;
-	pd->coba = add_colorband(1);
+	pd->coba = add_colorband(true);
 	pd->speed_scale = 1.0f;
 	pd->totpoints = 0;
 	pd->object = NULL;
