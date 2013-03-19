@@ -2041,11 +2041,11 @@ static void draw_dupli_objects_color(Scene *scene, ARegion *ar, View3D *v3d, Bas
 			    (dob->type == OB_DUPLIGROUP && dob->animated) ||
 			    !(bb_tmp = BKE_object_boundbox_get(dob->ob)))
 			{
-				// printf("draw_dupli_objects_color: skipping displist for %s\n", dob->ob->id.name+2);
+				// printf("draw_dupli_objects_color: skipping displist for %s\n", dob->ob->id.name + 2);
 				use_displist = FALSE;
 			}
 			else {
-				// printf("draw_dupli_objects_color: using displist for %s\n", dob->ob->id.name+2);
+				// printf("draw_dupli_objects_color: using displist for %s\n", dob->ob->id.name + 2);
 				bb = *bb_tmp; /* must make a copy  */
 
 				/* disable boundbox check for list creation */
@@ -2247,7 +2247,7 @@ void draw_depth(Scene *scene, ARegion *ar, View3D *v3d, int (*func)(void *), boo
 	
 	/* Setting these temporarily is not nice */
 	v3d->flag &= ~V3D_SELECT_OUTLINE;
-	U.glalphaclip = alphaoverride ? 0.5 : glalphaclip; /* not that nice but means we wont zoom into billboards */
+	U.glalphaclip = alphaoverride ? 0.5f : glalphaclip; /* not that nice but means we wont zoom into billboards */
 	U.obcenter_dia = 0;
 	
 	setwinmatrixview3d(ar, v3d, NULL);
