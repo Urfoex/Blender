@@ -5,6 +5,8 @@
 #include "GL/glew.h"
 
 #include <iostream>
+#include <sstream>
+
 #include "BL_Shader.h"
 #include "BL_Material.h"
 
@@ -132,45 +134,35 @@ shared_ptr< BL_Shader > BL_ShaderManager::AddShader(std::string shaderName) {
 }
 
 shared_ptr< BL_Shader > BL_ShaderManager::AddShader() {
-	auto pair = m_shaderLibrary.emplace(std::make_pair(std::to_string(NextShaderIndex()) + "_Shader", std::make_shared<BL_Shader>()));
-	pair.first->second->SetName(std::to_string(NextShaderIndex()) + "_Shader");
+	std::string name = "Shader::" + std::to_string(NextShaderIndex());
+	auto pair = m_shaderLibrary.emplace(std::make_pair(name, std::make_shared<BL_Shader>()));
+	pair.first->second->SetName(name);
 	return pair.first->second;
 }
 
-
-PyTypeObject BL_ShaderManager::Type = {
-	PyVarObject_HEAD_INIT(NULL, 0)
-	"BL_ShaderManager",
-	sizeof(PyObjectPlus_Proxy),
-	0,
-	py_base_dealloc,
-	0,
-	0,
-	0,
-	0,
-	py_base_repr,
-	0,0,0,0,0,0,0,0,0,
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-	0,0,0,0,0,0,0,
-	Methods,
-	0,
-	0,
-	&PyObjectPlus::Type,
-	0,0,0,0,0,0,
-	py_base_new
-};
-
-PyMethodDef BL_ShaderManager::Methods[] =
+unsigned long BL_ShaderManager::numAvailableShader()
 {
-	// creation
-// 	KX_PYMETHODTABLE( BL_Shader, setSource ),
-	
-	{NULL,NULL} //Sentinel
-};
+	return m_shaderLibrary.size();
+}
 
-PyAttributeDef BL_ShaderManager::Attributes[] = {
-	{ NULL }	//Sentinel
-};
+std::string BL_ShaderManager::availableShader()
+{
+	std::stringstream ss;
+	for( auto shader : m_shaderLibrary)
+		ss << shader.first << "\n";
+	return ss.str();
+}
+
+void BL_ShaderManager::RemoveShader(shared_ptr<BL_Shader>&& shader) {
+	auto item = m_shaderLibrary.find(shader->GetName());
+	if( item == std::end(m_shaderLibrary)){
+		return;
+	}
+	if(item->second.use_count() <= 2){
+		m_shaderLibrary.erase(shader->GetName());
+	}
+}
+
 
 
 bool BL_Shader::Ok()const
@@ -787,6 +779,8 @@ PyMethodDef BL_Shader::Methods[] =
 	KX_PYMETHODTABLE( BL_Shader, setNumberOfPasses ),
 	KX_PYMETHODTABLE( BL_Shader, validate),
 	KX_PYMETHODTABLE( BL_Shader, getName),
+	KX_PYMETHODTABLE( BL_Shader, numAvailableShader),
+	KX_PYMETHODTABLE( BL_Shader, listAvailableShader),
 	/// access functions
 	KX_PYMETHODTABLE( BL_Shader, isValid),
 	KX_PYMETHODTABLE( BL_Shader, setUniform1f ),
@@ -922,6 +916,16 @@ KX_PYMETHODDEF_DOC( BL_Shader, validate, "validate()")
 KX_PYMETHODDEF_DOC( BL_Shader, getName, "getName()")
 {
 	return PyUnicode_FromString(mName.c_str());
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, numAvailableShader, "numAvailableShader()")
+{
+	return PyLong_FromUnsignedLong(BL_ShaderManager::Instance()->numAvailableShader());
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, listAvailableShader, "listAvailableShader()")
+{
+	return PyUnicode_FromString(BL_ShaderManager::Instance()->availableShader().c_str());
 }
 
 KX_PYMETHODDEF_DOC( BL_Shader, setSampler, "setSampler(name, index)" )

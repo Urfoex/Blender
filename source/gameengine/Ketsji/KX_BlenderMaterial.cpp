@@ -216,9 +216,8 @@ void KX_BlenderMaterial::OnExit()
 			mLastShader = nullptr;
 		}
 
+		BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
 		mShader = nullptr;
-// 		delete mShader; // TODO Don't!
-// 		mShader = 0;
 	}
 
 	if ( mBlenderShader ) {
@@ -923,9 +922,8 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 			// We will then go back to fixed functionality
 			// for this material
 			if (mShader) {
+				BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
 				mShader = nullptr;
-// 				delete mShader; /* will handle python de-referencing */ // TODO Don't!
-// 				mShader=0;
 			}
 		}
 		Py_RETURN_NONE;

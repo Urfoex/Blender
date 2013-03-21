@@ -97,27 +97,20 @@ public:
 #endif
 };
 
-class BL_ShaderManager : public PyObjectPlus {
-	Py_Header
+class BL_ShaderManager{
 private:
 	static std::shared_ptr<BL_ShaderManager> m_shaderManager;
 	std::unordered_map<std::string, std::shared_ptr<BL_Shader>> m_shaderLibrary;
-	unsigned int m_nextShaderIndex;
+	unsigned long m_nextShaderIndex;
 	
 public:
 	static std::shared_ptr<BL_ShaderManager> Instance(){return m_shaderManager;};
-	unsigned int NextShaderIndex(){ return m_nextShaderIndex++;};
+	unsigned long NextShaderIndex(){ return m_nextShaderIndex++;};
 	std::shared_ptr<BL_Shader> AddShader( string shaderName );
 	std::shared_ptr<BL_Shader> AddShader();
-
-	// Python interface
-#ifdef WITH_PYTHON
-	virtual PyObject *py_repr(void) { return PyUnicode_FromFormat("BL_ShaderManager\n\tshader in use:%i\n\n", m_shaderLibrary.size()); }
-	
-	// -----------------------------------
-// 	KX_PYMETHOD_DOC(BL_Shader, setSource);
-
-#endif
+	void RemoveShader( shared_ptr<BL_Shader>&& shade );
+	unsigned long numAvailableShader();
+	std::string availableShader();
 };
 
 
@@ -255,6 +248,8 @@ public:
 	KX_PYMETHOD_DOC(BL_Shader, isValid);
 	KX_PYMETHOD_DOC(BL_Shader, validate);
 	KX_PYMETHOD_DOC(BL_Shader, getName);
+	KX_PYMETHOD_DOC(BL_Shader, numAvailableShader);
+	KX_PYMETHOD_DOC(BL_Shader, listAvailableShader);
 // 	KX_PYMETHOD_DOC(BL_Shader, setName);
 
 	// -----------------------------------
