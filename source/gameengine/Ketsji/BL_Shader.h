@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <array>
+#include <unordered_map>
 
 const int SHADER_ATTRIBMAX = 1;
 
@@ -96,6 +97,30 @@ public:
 #endif
 };
 
+class BL_ShaderManager : public PyObjectPlus {
+	Py_Header
+private:
+	static std::shared_ptr<BL_ShaderManager> m_shaderManager;
+	std::unordered_map<std::string, std::shared_ptr<BL_Shader>> m_shaderLibrary;
+	unsigned int m_nextShaderIndex;
+	
+public:
+	static std::shared_ptr<BL_ShaderManager> Instance(){return m_shaderManager;};
+	unsigned int NextShaderIndex(){ return m_nextShaderIndex++;};
+	std::shared_ptr<BL_Shader> AddShader( string shaderName );
+	std::shared_ptr<BL_Shader> AddShader();
+
+	// Python interface
+#ifdef WITH_PYTHON
+	virtual PyObject *py_repr(void) { return PyUnicode_FromFormat("BL_ShaderManager\n\tshader in use:%i\n\n", m_shaderLibrary.size()); }
+	
+	// -----------------------------------
+// 	KX_PYMETHOD_DOC(BL_Shader, setSource);
+
+#endif
+};
+
+
 /**
  * BL_Shader
  *  shader access
@@ -107,6 +132,7 @@ private:
 	typedef std::vector<std::shared_ptr<BL_UniformBase>>	BL_UniformVec;
 	typedef std::vector<std::shared_ptr<BL_DefUniform>>	BL_UniformVecDef;
 
+	std::string		mName;
 	unsigned int	mShader;			// Shader object 
 	int				mPass;				// 1.. unused
 	bool			mOk;				// Valid and ok
@@ -183,6 +209,9 @@ public:
 	void				SetProg(bool enable);
 	int					GetAttribute() { return mAttr; }
 
+	std::string GetName();
+	void SetName(std::string name);
+
 	// -- 
 	// Apply methods : sets colected uniforms
 	void ApplyShader();
@@ -225,6 +254,8 @@ public:
 	KX_PYMETHOD_DOC(BL_Shader, setNumberOfPasses);
 	KX_PYMETHOD_DOC(BL_Shader, isValid);
 	KX_PYMETHOD_DOC(BL_Shader, validate);
+	KX_PYMETHOD_DOC(BL_Shader, getName);
+// 	KX_PYMETHOD_DOC(BL_Shader, setName);
 
 	// -----------------------------------
 	KX_PYMETHOD_DOC(BL_Shader, setUniform4f);

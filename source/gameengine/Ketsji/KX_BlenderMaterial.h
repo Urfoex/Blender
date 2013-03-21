@@ -123,7 +123,7 @@ public:
 
 private:
 	BL_Material*		mMaterial;
-	BL_Shader*			mShader;
+	std::shared_ptr<BL_Shader>			mShader;
 	BL_BlenderShader*	mBlenderShader;
 	KX_Scene*		mScene;
 	BL_Texture		mTextures[MAXTEX];		// texture array
@@ -160,7 +160,7 @@ private:
 
 	// shader chacing
 	static BL_BlenderShader *mLastBlenderShader;
-	static BL_Shader		*mLastShader;
+	static std::shared_ptr<BL_Shader>		mLastShader;
 
 	mutable int	mPass;
 };

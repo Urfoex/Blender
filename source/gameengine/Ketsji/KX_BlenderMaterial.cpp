@@ -38,20 +38,20 @@
 
 #define spit(x) std::cout << x << std::endl;
 
-BL_Shader *KX_BlenderMaterial::mLastShader = NULL;
-BL_BlenderShader *KX_BlenderMaterial::mLastBlenderShader = NULL;
+std::shared_ptr<BL_Shader> KX_BlenderMaterial::mLastShader = nullptr;
+BL_BlenderShader *KX_BlenderMaterial::mLastBlenderShader = nullptr;
 
 //static PyObject *gTextureDict = 0;
 
 KX_BlenderMaterial::KX_BlenderMaterial()
 :	PyObjectPlus(),
 	RAS_IPolyMaterial(),
-	mMaterial(NULL),
-	mShader(0),
-	mBlenderShader(0),
-	mScene(NULL),
-	mUserDefBlend(0),
-	mModified(0),
+	mMaterial(nullptr),
+	mShader(nullptr),
+	mBlenderShader(nullptr),
+	mScene(nullptr),
+	mUserDefBlend(false),
+	mModified(false),
 	mConstructed(false),
 	mPass(0)
 {
@@ -78,11 +78,11 @@ void KX_BlenderMaterial::Initialize(
 		game
 	);
 	mMaterial = data;
-	mShader = 0;
-	mBlenderShader = 0;
+	mShader = nullptr;
+	mBlenderShader = nullptr;
 	mScene = scene;
-	mUserDefBlend = 0;
-	mModified = 0;
+	mUserDefBlend = false;
+	mModified = false;
 	mConstructed = false;
 	mPass = 0;
 	mLightLayer = lightlayer;
@@ -197,12 +197,12 @@ void KX_BlenderMaterial::EndFrame()
 {
 	if (mLastBlenderShader) {
 		mLastBlenderShader->SetProg(false);
-		mLastBlenderShader = NULL;
+		mLastBlenderShader = nullptr;
 	}
 
 	if (mLastShader) {
 		mLastShader->SetProg(false);
-		mLastShader = NULL;
+		mLastShader = nullptr;
 	}
 }
 
@@ -213,17 +213,18 @@ void KX_BlenderMaterial::OnExit()
 		//and this function is called per face
 		if (mShader == mLastShader) {
 			mShader->SetProg(false);
-			mLastShader = NULL;
+			mLastShader = nullptr;
 		}
 
-		delete mShader;
-		mShader = 0;
+		mShader = nullptr;
+// 		delete mShader; // TODO Don't!
+// 		mShader = 0;
 	}
 
 	if ( mBlenderShader ) {
 		if (mBlenderShader == mLastBlenderShader) {
 			mBlenderShader->SetProg(false);
-			mLastBlenderShader = NULL;
+			mLastBlenderShader = nullptr;
 		}
 
 		delete mBlenderShader;
@@ -239,9 +240,9 @@ void KX_BlenderMaterial::OnExit()
 	}
 
 	/* used to call with 'mMaterial->tface' but this can be a freed array,
-	 * see: [#30493], so just call with NULL, this is best since it clears
+	 * see: [#30493], so just call with nullptr, this is best since it clears
 	 * the 'lastface' pointer in GPU too - campbell */
-	GPU_set_tpage(NULL, 1, mMaterial->alphablend);
+	GPU_set_tpage(nullptr, 1, mMaterial->alphablend);
 }
 
 
@@ -254,7 +255,7 @@ void KX_BlenderMaterial::setShaderData( bool enable, RAS_IRasterizer *ras)
 		// frame cleanup.
 		if (mShader == mLastShader) {
 			mShader->SetProg(false);
-			mLastShader = NULL;
+			mLastShader = nullptr;
 		}
 
 		ras->SetAlphaBlend(TF_SOLID);
@@ -298,7 +299,7 @@ void KX_BlenderMaterial::setBlenderShaderData( bool enable, RAS_IRasterizer *ras
 		// frame cleanup.
 		if (mLastBlenderShader) {
 			mLastBlenderShader->SetProg(false);
-			mLastBlenderShader= NULL;
+			mLastBlenderShader= nullptr;
 		}
 		else
 			BL_Texture::DisableAllTextures();
@@ -388,7 +389,7 @@ KX_BlenderMaterial::ActivatShaders(
 
 	if (mLastBlenderShader) {
 		mLastBlenderShader->SetProg(false);
-		mLastBlenderShader= NULL;
+		mLastBlenderShader= nullptr;
 	}
 
 	if (GetCachingInfo() != cachingInfo) {
@@ -436,7 +437,7 @@ KX_BlenderMaterial::ActivateBlenderShaders(
 
 	if (mLastShader) {
 		mLastShader->SetProg(false);
-		mLastShader= NULL;
+		mLastShader= nullptr;
 	}
 
 	if (GetCachingInfo() != cachingInfo) {
@@ -482,12 +483,12 @@ KX_BlenderMaterial::ActivateMat(
 
 	if (mLastShader) {
 		mLastShader->SetProg(false);
-		mLastShader= NULL;
+		mLastShader= nullptr;
 	}
 
 	if (mLastBlenderShader) {
 		mLastBlenderShader->SetProg(false);
-		mLastBlenderShader= NULL;
+		mLastBlenderShader= nullptr;
 	}
 
 	if (GetCachingInfo() != cachingInfo) {
@@ -539,7 +540,7 @@ KX_BlenderMaterial::Activate(
 		else {
 			if (mShader == mLastShader) {
 				mShader->SetProg(false);
-				mLastShader = NULL;
+				mLastShader = nullptr;
 			}
 			mPass = 0;
 			return false;
@@ -810,18 +811,18 @@ PyMethodDef KX_BlenderMaterial::Methods[] =
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getShader ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getMaterialIndex ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, setBlending ),
-	{NULL,NULL} //Sentinel
+	{nullptr,nullptr} //Sentinel
 };
 
 PyAttributeDef KX_BlenderMaterial::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("shader", KX_BlenderMaterial, pyattr_get_shader),
 	KX_PYATTRIBUTE_RO_FUNCTION("material_index", KX_BlenderMaterial, pyattr_get_materialIndex),
 	KX_PYATTRIBUTE_RW_FUNCTION("blending", KX_BlenderMaterial, pyattr_get_blending, pyattr_set_blending),
-	{ NULL }	//Sentinel
+	{ nullptr }	//Sentinel
 };
 
 PyTypeObject KX_BlenderMaterial::Type = {
-	PyVarObject_HEAD_INIT(NULL, 0)
+	PyVarObject_HEAD_INIT(nullptr, 0)
 	"KX_BlenderMaterial",
 	sizeof(PyObjectPlus_Proxy),
 	0,
@@ -845,7 +846,7 @@ PyTypeObject KX_BlenderMaterial::Type = {
 PyObject *KX_BlenderMaterial::pyattr_get_shader(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_BlenderMaterial* self = static_cast<KX_BlenderMaterial*>(self_v);
-	return self->PygetShader(NULL, NULL);
+	return self->PygetShader(nullptr, nullptr);
 }
 
 PyObject *KX_BlenderMaterial::pyattr_get_materialIndex(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
@@ -864,7 +865,7 @@ PyObject *KX_BlenderMaterial::pyattr_get_blending(void *self_v, const KX_PYATTRI
 int KX_BlenderMaterial::pyattr_set_blending(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value)
 {
 	KX_BlenderMaterial* self = static_cast<KX_BlenderMaterial*>(self_v);
-	PyObject *obj = self->PysetBlending(value, NULL);
+	PyObject *obj = self->PysetBlending(value, nullptr);
 	if (obj)
 	{
 		Py_DECREF(obj);
@@ -902,7 +903,8 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 		// the calling script will need to check
 
 		if (!mShader && !mModified) {
-			mShader = new BL_Shader();
+			mShader = BL_ShaderManager::Instance()->AddShader(); // TODO Add way to use own shader names
+// 			mShader = new BL_Shader(); // TODO replace
 			mModified = true;
 
 			// Using a custom shader, make sure to initialize textures
@@ -921,14 +923,15 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 			// We will then go back to fixed functionality
 			// for this material
 			if (mShader) {
-				delete mShader; /* will handle python de-referencing */
-				mShader=0;
+				mShader = nullptr;
+// 				delete mShader; /* will handle python de-referencing */ // TODO Don't!
+// 				mShader=0;
 			}
 		}
 		Py_RETURN_NONE;
 	}
 	PyErr_SetString(PyExc_ValueError, "material.getShader(): KX_BlenderMaterial, GLSL Error");
-	return NULL;
+	return nullptr;
 }
 
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getMaterialIndex, "getMaterialIndex()")
@@ -939,13 +942,13 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getMaterialIndex, "getMaterialIndex()")
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getTexture, "getTexture( index )" )
 {
 	// TODO: enable python switching
-	return NULL;
+	return nullptr;
 }
 
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setTexture , "setTexture( index, tex)")
 {
 	// TODO: enable python switching
-	return NULL;
+	return nullptr;
 }
 
 static unsigned int GL_array[11] = {
@@ -982,12 +985,12 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setBlending , "setBlending( bge.logic.sr
 		}
 		if (!value_found[0] || !value_found[1]) {
 			PyErr_SetString(PyExc_ValueError, "material.setBlending(int, int): KX_BlenderMaterial, invalid enum.");
-			return NULL;
+			return nullptr;
 		}
 		mUserDefBlend = true;
 		Py_RETURN_NONE;
 	}
-	return NULL;
+	return nullptr;
 }
 
 #endif // WITH_PYTHON

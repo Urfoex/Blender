@@ -118,6 +118,60 @@ void BL_Uniform<data_t, size>::SetData( std::array<data_t, size>&& data, int loc
 #endif
 }
 
+std::shared_ptr<BL_ShaderManager> BL_ShaderManager::m_shaderManager = std::make_shared<BL_ShaderManager>();
+
+shared_ptr< BL_Shader > BL_ShaderManager::AddShader(std::string shaderName) {
+	auto it = m_shaderLibrary.find(shaderName);
+	if( it != std::end(m_shaderLibrary)){
+		return it->second;
+	}else{
+		auto pair = m_shaderLibrary.emplace(std::make_pair(shaderName, std::make_shared<BL_Shader>()));
+		pair.first->second->SetName(shaderName);
+		return pair.first->second;
+	}
+}
+
+shared_ptr< BL_Shader > BL_ShaderManager::AddShader() {
+	auto pair = m_shaderLibrary.emplace(std::make_pair(std::to_string(NextShaderIndex()) + "_Shader", std::make_shared<BL_Shader>()));
+	pair.first->second->SetName(std::to_string(NextShaderIndex()) + "_Shader");
+	return pair.first->second;
+}
+
+
+PyTypeObject BL_ShaderManager::Type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"BL_ShaderManager",
+	sizeof(PyObjectPlus_Proxy),
+	0,
+	py_base_dealloc,
+	0,
+	0,
+	0,
+	0,
+	py_base_repr,
+	0,0,0,0,0,0,0,0,0,
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+	0,0,0,0,0,0,0,
+	Methods,
+	0,
+	0,
+	&PyObjectPlus::Type,
+	0,0,0,0,0,0,
+	py_base_new
+};
+
+PyMethodDef BL_ShaderManager::Methods[] =
+{
+	// creation
+// 	KX_PYMETHODTABLE( BL_Shader, setSource ),
+	
+	{NULL,NULL} //Sentinel
+};
+
+PyAttributeDef BL_ShaderManager::Attributes[] = {
+	{ NULL }	//Sentinel
+};
+
 
 bool BL_Shader::Ok()const
 {
@@ -416,6 +470,15 @@ void BL_Shader::SetProg(bool enable)
 		}
 	}
 }
+
+string BL_Shader::GetName() {
+	return mName;
+}
+
+void BL_Shader::SetName( string name ) {
+	mName = name;
+}
+
 
 void BL_Shader::Update( const RAS_MeshSlot & ms, RAS_IRasterizer* rasty )
 {
@@ -723,6 +786,7 @@ PyMethodDef BL_Shader::Methods[] =
 	KX_PYMETHODTABLE( BL_Shader, getFragmentProg ),
 	KX_PYMETHODTABLE( BL_Shader, setNumberOfPasses ),
 	KX_PYMETHODTABLE( BL_Shader, validate),
+	KX_PYMETHODTABLE( BL_Shader, getName),
 	/// access functions
 	KX_PYMETHODTABLE( BL_Shader, isValid),
 	KX_PYMETHODTABLE( BL_Shader, setUniform1f ),
@@ -855,6 +919,10 @@ KX_PYMETHODDEF_DOC( BL_Shader, validate, "validate()")
 	Py_RETURN_NONE;
 }
 
+KX_PYMETHODDEF_DOC( BL_Shader, getName, "getName()")
+{
+	return PyUnicode_FromString(mName.c_str());
+}
 
 KX_PYMETHODDEF_DOC( BL_Shader, setSampler, "setSampler(name, index)" )
 {
