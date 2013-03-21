@@ -1,3 +1,5 @@
 # use glob syntax.
 syntax: glob
 release/datafiles/locale/
+*.kdev4
+*~

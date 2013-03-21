@@ -6579,6 +6579,8 @@ static void direct_link_movieclip(FileData *fd, MovieClip *clip)
 	clip->tracking.dopesheet.channels.first = clip->tracking.dopesheet.channels.last = NULL;
 	clip->tracking.dopesheet.coverage_segments.first = clip->tracking.dopesheet.coverage_segments.last = NULL;
 
+	clip->prefetch_ok = FALSE;
+
 	link_list(fd, &tracking->objects);
 	
 	for (object = tracking->objects.first; object; object = object->next) {
@@ -9024,6 +9026,26 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			 * In old Blender versions they will be removed automatically due to undefined type */
 			if (!MAIN_VERSION_ATLEAST(main, 266, 2))
 				ntree->flag |= NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE;
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 266, 3)) {
+		{
+			/* Fix for a very old issue:
+			 * Node names were nominally made unique in r24478 (2.50.8), but the do_versions check
+			 * to update existing node names only applied to main->nodetree (i.e. group nodes).
+			 * Uniqueness is now required for proper preview mapping,
+			 * so do this now to ensure old files don't break.
+			 */
+			bNode *node;
+			FOREACH_NODETREE(main, ntree, id) {
+				if (id == &ntree->id)
+					continue;	/* already fixed for node groups */
+				
+				for (node = ntree->nodes.first; node; node = node->next)
+					nodeUniqueName(ntree, node);
+			}
+			FOREACH_NODETREE_END
 		}
 	}
 

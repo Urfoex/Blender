@@ -114,18 +114,18 @@ static void node_add_menu_class(bContext *C, uiLayout *layout, void *arg_nodecla
 				continue;
 			
 			switch (ntree->type) {
-			case NTREE_COMPOSIT:
-				ngroup_type = "CompositorNodeTree";
-				node_type = "CompositorNodeGroup";
-				break;
-			case NTREE_SHADER:
-				ngroup_type = "ShaderNodeTree";
-				node_type = "ShaderNodeGroup";
-				break;
-			case NTREE_TEXTURE:
-				ngroup_type = "TextureNodeTree";
-				node_type = "TextureNodeGroup";
-				break;
+				case NTREE_COMPOSIT:
+					ngroup_type = "CompositorNodeTree";
+					node_type = "CompositorNodeGroup";
+					break;
+				case NTREE_SHADER:
+					ngroup_type = "ShaderNodeTree";
+					node_type = "ShaderNodeGroup";
+					break;
+				case NTREE_TEXTURE:
+					ngroup_type = "TextureNodeTree";
+					node_type = "TextureNodeGroup";
+					break;
 			}
 			
 			ptr = uiItemFullO(layout, "NODE_OT_group_make", "New Group", ntype->ui_icon, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
@@ -1165,7 +1165,7 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 	if (!node->id) return;
 
 	col = uiLayoutColumn(layout, FALSE);
-	row = uiLayoutRow(col, FALSE);
+	row = uiLayoutRow(col, TRUE);
 	uiItemR(row, ptr, "layer", 0, "", ICON_NONE);
 	
 	prop = RNA_struct_find_property(ptr, "layer");
@@ -2708,8 +2708,57 @@ static void node_template_properties_update(bNodeType *ntype)
 	}
 }
 
+static void node_socket_undefined_draw(bContext *UNUSED(C), uiLayout *layout, PointerRNA *UNUSED(ptr), PointerRNA *UNUSED(node_ptr))
+{
+	uiItemL(layout, "Undefined Socket Type", ICON_ERROR);
+}
+
+static void node_socket_undefined_draw_color(bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PointerRNA *UNUSED(node_ptr), float *r_color)
+{
+	r_color[0] = 1.0f;
+	r_color[1] = 0.0f;
+	r_color[2] = 0.0f;
+	r_color[3] = 1.0f;
+}
+
+static void node_socket_undefined_interface_draw(bContext *UNUSED(C), uiLayout *layout, PointerRNA *UNUSED(ptr))
+{
+	uiItemL(layout, "Undefined Socket Type", ICON_ERROR);
+}
+
+static void node_socket_undefined_interface_draw_color(bContext *UNUSED(C), PointerRNA *UNUSED(ptr), float *r_color)
+{
+	r_color[0] = 1.0f;
+	r_color[1] = 0.0f;
+	r_color[2] = 0.0f;
+	r_color[3] = 1.0f;
+}
+
 void ED_node_init_butfuncs(void)
 {
+	/* Fallback types for undefined tree, nodes, sockets
+	 * Defined in blenkernel, but not registered in type hashes.
+	 */
+	/*extern bNodeTreeType NodeTreeTypeUndefined;*/
+	extern bNodeType NodeTypeUndefined;
+	extern bNodeSocketType NodeSocketTypeUndefined;
+	
+	/* default ui functions */
+	NodeTypeUndefined.drawfunc = node_draw_default;
+	NodeTypeUndefined.drawupdatefunc = node_update_default;
+	NodeTypeUndefined.select_area_func = node_select_area_default;
+	NodeTypeUndefined.tweak_area_func = node_tweak_area_default;
+	NodeTypeUndefined.uifunc = NULL;
+	NodeTypeUndefined.uifuncbut = NULL;
+	NodeTypeUndefined.drawinputfunc = node_draw_input_default;
+	NodeTypeUndefined.drawoutputfunc = node_draw_output_default;
+	NodeTypeUndefined.resize_area_func = node_resize_area_default;
+	
+	NodeSocketTypeUndefined.draw = node_socket_undefined_draw;
+	NodeSocketTypeUndefined.draw_color = node_socket_undefined_draw_color;
+	NodeSocketTypeUndefined.interface_draw = node_socket_undefined_interface_draw;
+	NodeSocketTypeUndefined.interface_draw_color = node_socket_undefined_interface_draw_color;
+	
 	/* node type ui functions */
 	NODE_TYPES_BEGIN(ntype)
 		/* default ui functions */
@@ -2915,7 +2964,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode)
 					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 					glPixelZoom(snode->zoom, snode->zoom);
 					
-					glaDrawPixelsAuto(x, y, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_LINEAR, display_buffer);
+					glaDrawPixelsAuto(x, y, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer);
 					
 					glPixelZoom(1.0f, 1.0f);
 					glDisable(GL_BLEND);
@@ -2923,7 +2972,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode)
 				else {
 					glPixelZoom(snode->zoom, snode->zoom);
 
-					glaDrawPixelsAuto(x, y, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_LINEAR, display_buffer);
+					glaDrawPixelsAuto(x, y, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer);
 					
 					glPixelZoom(1.0f, 1.0f);
 				}
