@@ -808,6 +808,7 @@ void KX_BlenderMaterial::SetBlenderGLSLShader()
 PyMethodDef KX_BlenderMaterial::Methods[] = 
 {
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getShader ),
+	KX_PYMETHODTABLE( KX_BlenderMaterial, setShader ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getMaterialIndex ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, setBlending ),
 	{nullptr,nullptr} //Sentinel
@@ -930,6 +931,46 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 	}
 	PyErr_SetString(PyExc_ValueError, "material.getShader(): KX_BlenderMaterial, GLSL Error");
 	return nullptr;
+}
+
+KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setShader , "setShader( shaderName)")
+{
+	bool hadShader = false;
+	if(mShader){
+		BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
+		mShader = nullptr;
+		hadShader = true;
+	}
+
+	char *shaderName;
+	int apply=0;
+	if ( PyArg_ParseTuple(args, "s:setShader", &shaderName) )
+	{
+		std::string name = std::string(shaderName);
+		mShader = BL_ShaderManager::Instance()->GetShader(name);
+		mModified = true;
+		if(mShader && !hadShader){
+			InitTextures();
+		}
+		if (mShader && !mShader->GetError()) {
+			m_flag &= ~RAS_BLENDERGLSL;
+			mMaterial->SetSharedMaterial(true);
+			mScene->GetBucketManager()->ReleaseDisplayLists(this);
+			return mShader->GetProxy();
+		}
+		else {
+			// decref all references to the object
+			// then delete it!
+			// We will then go back to fixed functionality
+			// for this material
+			if (mShader) {
+				BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
+				mShader = nullptr;
+			}
+		}
+		Py_RETURN_NONE;
+	}
+	return NULL;
 }
 
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getMaterialIndex, "getMaterialIndex()")

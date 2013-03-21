@@ -163,7 +163,14 @@ void BL_ShaderManager::RemoveShader(shared_ptr<BL_Shader>&& shader) {
 	}
 }
 
-
+shared_ptr< BL_Shader > BL_ShaderManager::GetShader(std::string shaderName) {
+	auto it = m_shaderLibrary.find(shaderName);
+	if( it != std::end(m_shaderLibrary)){
+		return it->second;
+	}else{
+		return nullptr;
+	}
+}
 
 bool BL_Shader::Ok()const
 {

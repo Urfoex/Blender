@@ -109,6 +109,7 @@ public:
 	std::shared_ptr<BL_Shader> AddShader( string shaderName );
 	std::shared_ptr<BL_Shader> AddShader();
 	void RemoveShader( shared_ptr<BL_Shader>&& shade );
+	std::shared_ptr<BL_Shader> GetShader(string shaderName);
 	unsigned long numAvailableShader();
 	std::string availableShader();
 };
