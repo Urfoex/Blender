@@ -829,9 +829,9 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, ReportList *reports,
 
 	if (verify_limits) {
 		/* remove other socket links if limit is exceeded */
-		if (nodeCountSocketLinks(ntree, fromsock) > fromsock->limit)
+		if (nodeCountSocketLinks(ntree, fromsock) + 1 > fromsock->limit)
 			nodeRemSocketLinks(ntree, fromsock);
-		if (nodeCountSocketLinks(ntree, tosock) > tosock->limit)
+		if (nodeCountSocketLinks(ntree, tosock) + 1 > tosock->limit)
 			nodeRemSocketLinks(ntree, tosock);
 	}
 
@@ -2843,6 +2843,11 @@ static void def_group_output(StructRNA *srna)
 	RNA_def_property_struct_type(prop, "PropertyGroup");
 	RNA_def_property_flag(prop, PROP_IDPROPERTY);
 	RNA_def_property_ui_text(prop, "Interface", "Interface socket data");
+	
+	prop = RNA_def_property(srna, "is_active_output", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", NODE_DO_OUTPUT);
+	RNA_def_property_ui_text(prop, "Active Output", "True if this node is used as the active group output");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
 static void def_group(StructRNA *srna)
