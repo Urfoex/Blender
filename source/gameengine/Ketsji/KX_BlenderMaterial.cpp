@@ -809,6 +809,7 @@ PyMethodDef KX_BlenderMaterial::Methods[] =
 {
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getShader ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, setShader ),
+	KX_PYMETHODTABLE( KX_BlenderMaterial, createShader ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, getMaterialIndex ),
 	KX_PYMETHODTABLE( KX_BlenderMaterial, setBlending ),
 	{nullptr,nullptr} //Sentinel
@@ -904,7 +905,6 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 
 		if (!mShader && !mModified) {
 			mShader = BL_ShaderManager::Instance()->AddShader(); // TODO Add way to use own shader names
-// 			mShader = new BL_Shader(); // TODO replace
 			mModified = true;
 
 			// Using a custom shader, make sure to initialize textures
@@ -935,18 +935,20 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getShader , "getShader()")
 
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setShader , "setShader( shaderName)")
 {
-	bool hadShader = false;
-	if(mShader){
-		BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
-		mShader = nullptr;
-		hadShader = true;
-	}
-
 	char *shaderName;
-	int apply=0;
 	if ( PyArg_ParseTuple(args, "s:setShader", &shaderName) )
 	{
 		std::string name = std::string(shaderName);
+
+		bool hadShader = false;
+		if(mShader && name.compare(mShader->GetName()) == 0){
+			Py_RETURN_NONE;
+		}else if(mShader){
+			BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
+			mShader = nullptr;
+			hadShader = true;
+		}
+		
 		mShader = BL_ShaderManager::Instance()->GetShader(name);
 		mModified = true;
 		if(mShader && !hadShader){
@@ -957,8 +959,7 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setShader , "setShader( shaderName)")
 			mMaterial->SetSharedMaterial(true);
 			mScene->GetBucketManager()->ReleaseDisplayLists(this);
 			return mShader->GetProxy();
-		}
-		else {
+		}else {
 			// decref all references to the object
 			// then delete it!
 			// We will then go back to fixed functionality
@@ -971,6 +972,75 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setShader , "setShader( shaderName)")
 		Py_RETURN_NONE;
 	}
 	return NULL;
+}
+
+KX_PYMETHODDEF_DOC( KX_BlenderMaterial, createShader , "createShader(shaderName)")
+{
+	if ( !GLEW_ARB_fragment_shader) {
+		if (!mModified)
+			spit("Fragment shaders not supported");
+		
+		mModified = true;
+		Py_RETURN_NONE;
+	}
+	
+	if ( !GLEW_ARB_vertex_shader) {
+		if (!mModified)
+			spit("Vertex shaders not supported");
+		
+		mModified = true;
+		Py_RETURN_NONE;
+	}
+	
+	if (!GLEW_ARB_shader_objects) {
+		if (!mModified)
+			spit("GLSL not supported");
+		mModified = true;
+		Py_RETURN_NONE;
+	}
+	else {
+		char *shaderName;
+		if ( PyArg_ParseTuple(args, "s:createShader", &shaderName) )
+		{
+			std::string name = std::string(shaderName);
+			
+			bool hadShader = false;
+			if(mShader && name.compare(mShader->GetName()) == 0){
+				return mShader->GetProxy();
+			}else if(mShader){
+				BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
+				mShader = nullptr;
+				hadShader = true;
+			}
+			
+			mShader = BL_ShaderManager::Instance()->GetShader(name);
+			if( !mShader){
+				mShader = BL_ShaderManager::Instance()->AddShader(name);
+			}
+			mModified = true;
+			if(mShader && !hadShader){
+				InitTextures();
+			}
+			if (mShader && !mShader->GetError()) {
+				m_flag &= ~RAS_BLENDERGLSL;
+				mMaterial->SetSharedMaterial(true);
+				mScene->GetBucketManager()->ReleaseDisplayLists(this);
+				return mShader->GetProxy();
+			}else {
+				// decref all references to the object
+				// then delete it!
+				// We will then go back to fixed functionality
+				// for this material
+				if (mShader) {
+					BL_ShaderManager::Instance()->RemoveShader(std::move(mShader));
+					mShader = nullptr;
+				}
+			}
+			Py_RETURN_NONE;
+		}
+	}
+	PyErr_SetString(PyExc_ValueError, "material.createShader(): KX_BlenderMaterial, GLSL Error");
+	return nullptr;
 }
 
 KX_PYMETHODDEF_DOC( KX_BlenderMaterial, getMaterialIndex, "getMaterialIndex()")
