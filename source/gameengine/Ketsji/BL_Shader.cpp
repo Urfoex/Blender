@@ -781,6 +781,7 @@ PyMethodDef BL_Shader::Methods[] =
 	// creation
 	KX_PYMETHODTABLE( BL_Shader, setSource ),
 	KX_PYMETHODTABLE( BL_Shader, delSource ),
+	KX_PYMETHODTABLE( BL_Shader, hasSource ),
 	KX_PYMETHODTABLE( BL_Shader, getVertexProg ),
 	KX_PYMETHODTABLE( BL_Shader, getFragmentProg ),
 	KX_PYMETHODTABLE( BL_Shader, setNumberOfPasses ),
@@ -874,6 +875,14 @@ KX_PYMETHODDEF_DOC( BL_Shader, delSource, "delSource( )" )
 	mOk			= false;
 	mUse		= false;
 	Py_RETURN_NONE;
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, hasSource, "hasSource()" )
+{
+	if( !mVertProg.empty() && !mFragProg.empty()){
+		return PyBool_FromLong(true);
+	}
+	return PyBool_FromLong(false);
 }
 
 KX_PYMETHODDEF_DOC( BL_Shader, isValid, "isValid()" )
