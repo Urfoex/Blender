@@ -791,6 +791,8 @@ PyMethodDef BL_Shader::Methods[] =
 	KX_PYMETHODTABLE( BL_Shader, listAvailableShader),
 	/// access functions
 	KX_PYMETHODTABLE( BL_Shader, isValid),
+
+	KX_PYMETHODTABLE( BL_Shader, hasUniform ),
 	KX_PYMETHODTABLE( BL_Shader, setUniform1f ),
 	KX_PYMETHODTABLE( BL_Shader, setUniform2f ),
 	KX_PYMETHODTABLE( BL_Shader, setUniform3f ),
@@ -984,6 +986,23 @@ KX_PYMETHODDEF_DOC( BL_Shader, setNumberOfPasses, "setNumberOfPasses( max-pass )
 
 	mPass = 1;
 	Py_RETURN_NONE;
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, hasUniform, "hasUniform(name)" )
+{
+	if (mError) {
+		Py_RETURN_NONE;
+	}
+	
+	const char *uniform;
+	if (PyArg_ParseTuple(args, "s:hasUniform", &uniform))
+	{
+		if( glGetUniformLocation(mShader, uniform) != -1){
+			return PyBool_FromLong(true);
+		}
+		return PyBool_FromLong(false);
+	}
+	return NULL;
 }
 
 /// access functions

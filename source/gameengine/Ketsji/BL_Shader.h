@@ -255,6 +255,7 @@ public:
 // 	KX_PYMETHOD_DOC(BL_Shader, setName);
 
 	// -----------------------------------
+	KX_PYMETHOD_DOC(BL_Shader, hasUniform);
 	KX_PYMETHOD_DOC(BL_Shader, setUniform4f);
 	KX_PYMETHOD_DOC(BL_Shader, setUniform3f);
 	KX_PYMETHOD_DOC(BL_Shader, setUniform2f);
