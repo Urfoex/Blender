@@ -19,6 +19,7 @@
 #include <memory>
 #include <array>
 #include <unordered_map>
+#include <exception>
 
 const int SHADER_ATTRIBMAX = 1;
 
@@ -114,6 +115,12 @@ public:
 	std::string availableShader();
 };
 
+class BL_ShaderException : public exception{
+private:
+	
+public:
+	BL_ShaderException(){};
+};
 
 /**
  * BL_Shader
@@ -134,13 +141,14 @@ private:
 //BL_Sampler		mSampler[MAXTEX];	// Number of samplers
 	int				mAttr;				// Tangent attribute
 	std::string		mVertProg;			// Vertex program string
+	std::string		mGeomProg;			// Vertex program string
 	std::string		mFragProg;			// Fragment program string
 	bool			mError;				// ...
 	bool			mDirty;				// 
 
 	// Compiles and links the shader
 	bool LinkProgram();
-	bool OnProgramError( unsigned int tmpVert = 0, unsigned int tmpFrag = 0, unsigned int tmpProg = 0 );
+	bool OnProgramError( unsigned int tmpVert = 0, unsigned int tmpGeom = 0, unsigned int tmpFrag = 0, unsigned int tmpProg = 0 );
 
 	// Stored uniform variables
 	BL_UniformVec		mUniforms;
@@ -150,6 +158,7 @@ private:
 	std::shared_ptr<BL_UniformBase>	FindUniform(const int location);
 	// clears uniform data
 	void			ClearUniforms();
+	int BuildShader(int shaderType, std::string shaderTypeName, std::string shaderSource, std::string logInfo);
 
 public:
 	BL_Shader();
@@ -242,9 +251,11 @@ public:
 
 	// -----------------------------------
 	KX_PYMETHOD_DOC(BL_Shader, setSource);
+	KX_PYMETHOD_DOC(BL_Shader, setVGFSource);
 	KX_PYMETHOD_DOC(BL_Shader, delSource);
 	KX_PYMETHOD_DOC(BL_Shader, hasSource);
 	KX_PYMETHOD_DOC(BL_Shader, getVertexProg);
+	KX_PYMETHOD_DOC(BL_Shader, getGeometryProg);
 	KX_PYMETHOD_DOC(BL_Shader, getFragmentProg);
 	KX_PYMETHOD_DOC(BL_Shader, setNumberOfPasses);
 	KX_PYMETHOD_DOC(BL_Shader, isValid);

@@ -272,17 +272,53 @@ void BL_Shader::UnloadShader()
 	//
 }
 
+int BL_Shader::BuildShader(int shaderType, std::string shaderTypeName, std::string shaderSource, std::string logInfo){
+	int tmpVert = 0;
+	int infoLogLength = 0;
+	int compileStatus = 0;
+	char *logInf = nullptr;
+	int char_len = 0;
+	
+	
+	// -- vertex shader ------------------
+	tmpVert = glCreateShaderObjectARB(shaderType/*GL_VERTEX_SHADER_ARB*/);
+	auto vertSource = /*mVertProg*/shaderSource.c_str();
+	glShaderSourceARB(tmpVert, 1, (const char**)&vertSource, 0);
+	glCompileShaderARB(tmpVert);
+	glGetObjectParameterivARB(tmpVert, GL_OBJECT_INFO_LOG_LENGTH_ARB,(GLint*) &infoLogLength);
+	
+	// print info if any
+	if ( infoLogLength > 0 && infoLogLength < MAX_LOG_LEN) {
+		logInf = (char*)MEM_mallocN(infoLogLength, /*"vert-log"*/logInfo.c_str());
+		glGetInfoLogARB(tmpVert, infoLogLength, (GLsizei*)&char_len, logInf);
+		if (char_len >0) {
+			spit("---- " << shaderTypeName << " Shader Error ----");
+			spit(logInf);
+		}
+		MEM_freeN(logInf);
+		logInf=0;
+	}
+	// check for compile errors
+	glGetObjectParameterivARB(tmpVert, GL_OBJECT_COMPILE_STATUS_ARB,(GLint*)&compileStatus);
+	if (!compileStatus) {
+		spit("---- " << shaderTypeName << " shader failed to compile ----");
+// 		OnProgramError(tmpVert, tmpFrag, tmpProg);
+// 		return -1;
+		throw BL_ShaderException();
+	}
+	return tmpVert;
+}
 
 bool BL_Shader::LinkProgram()
 {
-	int vertlen = 0, fraglen = 0, proglen = 0;
-	int vertstatus = 0, fragstatus = 0, progstatus = 0;
-	unsigned int tmpVert = 0, tmpFrag = 0, tmpProg = 0;
+	int proglen = 0;
+	int progstatus = 0;
+	unsigned int tmpVert = 0, tmpGeom = 0, tmpFrag = 0, tmpProg = 0;
 	int char_len = 0;
 	char *logInf = nullptr;
 
 	if (mError){
-		return OnProgramError(tmpVert, tmpFrag, tmpProg);
+		return OnProgramError(tmpVert, tmpGeom, tmpFrag, tmpProg);
 	}
 	
 	if (mVertProg.empty() || mFragProg.empty()) {
@@ -293,64 +329,27 @@ bool BL_Shader::LinkProgram()
 		spit("Fragment shaders not supported");
 		return false;
 	}
+	// Check for geom shader support
 	if ( !GLEW_ARB_vertex_shader) {
 		spit("Vertex shaders not supported");
 		return false;
 	}
-	
-	// -- vertex shader ------------------
-	tmpVert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-	auto vertSource = mVertProg.c_str();
-	glShaderSourceARB(tmpVert, 1, (const char**)&vertSource, 0);
-	glCompileShaderARB(tmpVert);
-	glGetObjectParameterivARB(tmpVert, GL_OBJECT_INFO_LOG_LENGTH_ARB,(GLint*) &vertlen);
-	
-	// print info if any
-	if ( vertlen > 0 && vertlen < MAX_LOG_LEN) {
-		logInf = (char*)MEM_mallocN(vertlen, "vert-log");
-		glGetInfoLogARB(tmpVert, vertlen, (GLsizei*)&char_len, logInf);
-		if (char_len >0) {
-			spit("---- Vertex Shader Error ----");
-			spit(logInf);
-		}
-		MEM_freeN(logInf);
-		logInf=0;
-	}
-	// check for compile errors
-	glGetObjectParameterivARB(tmpVert, GL_OBJECT_COMPILE_STATUS_ARB,(GLint*)&vertstatus);
-	if (!vertstatus) {
-		spit("---- Vertex shader failed to compile ----");
-		return OnProgramError(tmpVert, tmpFrag, tmpProg);
-	}
 
-	// -- fragment shader ----------------
-	tmpFrag = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-	auto fragSource = mFragProg.c_str();
-	glShaderSourceARB(tmpFrag, 1,(const char**)&fragSource, 0);
-	glCompileShaderARB(tmpFrag);
-	glGetObjectParameterivARB(tmpFrag, GL_OBJECT_INFO_LOG_LENGTH_ARB, (GLint*) &fraglen);
-	if (fraglen >0 && fraglen < MAX_LOG_LEN) {
-		logInf = (char*)MEM_mallocN(fraglen, "frag-log");
-		glGetInfoLogARB(tmpFrag, fraglen,(GLsizei*) &char_len, logInf);
-		if (char_len >0) {
-			spit("---- Fragment Shader Error ----");
-			spit(logInf);
-		}
-		MEM_freeN(logInf);
-		logInf=0;
+	try{
+		tmpVert = BuildShader(GL_VERTEX_SHADER_ARB, "Vertex", mVertProg, "vert-log");
+		if(!mGeomProg.empty())
+			tmpGeom = BuildShader(GL_GEOMETRY_SHADER_ARB, "Geometry", mGeomProg, "geom-log");
+		tmpFrag = BuildShader(GL_FRAGMENT_SHADER_ARB, "Fragment", mFragProg, "frag-log");
+	}catch(BL_ShaderException se){
+		return OnProgramError(tmpVert, tmpGeom, tmpFrag, tmpProg);
 	}
-
-	glGetObjectParameterivARB(tmpFrag, GL_OBJECT_COMPILE_STATUS_ARB, (GLint*) &fragstatus);
-	if (!fragstatus) {
-		spit("---- Fragment shader failed to compile ----");
-		return OnProgramError(tmpVert, tmpFrag, tmpProg);
-	}
-
 	
 	// -- program ------------------------
 	//  set compiled vert/frag shader & link
 	tmpProg = glCreateProgramObjectARB();
 	glAttachObjectARB(tmpProg, tmpVert);
+	if(!mGeomProg.empty())
+		glAttachObjectARB(tmpProg, tmpGeom);
 	glAttachObjectARB(tmpProg, tmpFrag);
 	glLinkProgramARB(tmpProg);
 	glGetObjectParameterivARB(tmpProg, GL_OBJECT_INFO_LOG_LENGTH_ARB, (GLint*) &proglen);
@@ -370,30 +369,35 @@ bool BL_Shader::LinkProgram()
 
 	if (!progstatus) {
 		spit("---- GLSL program failed to link ----");
-		return OnProgramError(tmpVert, tmpFrag, tmpProg);
+		return OnProgramError(tmpVert, tmpGeom, tmpFrag, tmpProg);
 	}
 
 	// set
 	mShader = tmpProg;
-	glDeleteObjectARB(tmpVert);
-	glDeleteObjectARB(tmpFrag);
+	glDeleteShader(tmpVert);
+	glDeleteShader(tmpGeom);
+	glDeleteShader(tmpFrag);
 	mOk		= 1;
 	mError = 0;
 	return true;
 }
 
-bool BL_Shader::OnProgramError(unsigned int tmpVert, unsigned int tmpFrag, unsigned int tmpProg) {
+bool BL_Shader::OnProgramError(unsigned int tmpVert, unsigned int tmpGeom, unsigned int tmpFrag, unsigned int tmpProg) {
 	if (tmpVert) {
-		glDeleteObjectARB(tmpVert);
+		glDeleteShader(tmpVert);
 		tmpVert=0;
 	}
+	if (tmpGeom) {
+		glDeleteShader(tmpGeom);
+		tmpGeom=0;
+	}
 	if (tmpFrag) {
-		glDeleteObjectARB(tmpFrag);
+		glDeleteShader(tmpFrag);
 		tmpFrag=0;
 	}
 	
 	if (tmpProg) {
-		glDeleteObjectARB(tmpProg);
+		glDeleteProgram(tmpProg);
 		tmpProg=0;
 	}
 	
@@ -780,9 +784,11 @@ PyMethodDef BL_Shader::Methods[] =
 {
 	// creation
 	KX_PYMETHODTABLE( BL_Shader, setSource ),
+	KX_PYMETHODTABLE( BL_Shader, setVGFSource ),
 	KX_PYMETHODTABLE( BL_Shader, delSource ),
 	KX_PYMETHODTABLE( BL_Shader, hasSource ),
 	KX_PYMETHODTABLE( BL_Shader, getVertexProg ),
+	KX_PYMETHODTABLE( BL_Shader, getGeometryProg ),
 	KX_PYMETHODTABLE( BL_Shader, getFragmentProg ),
 	KX_PYMETHODTABLE( BL_Shader, setNumberOfPasses ),
 	KX_PYMETHODTABLE( BL_Shader, validate),
@@ -845,23 +851,53 @@ KX_PYMETHODDEF_DOC( BL_Shader, setSource," setSource(vertexProgram, fragmentProg
 	if (mShader !=0 && mOk  )
 	{
 		// already set...
-		Py_RETURN_NONE;
+		return PyBool_FromLong(false);
 	}
 	char *v,*f;
 	int apply=0;
 	if ( PyArg_ParseTuple(args, "ssi:setSource", &v, &f, &apply) )
 	{
 		mVertProg = std::string(v);
+		mGeomProg = "";
 		mFragProg = std::string(f);
 		if ( LinkProgram() ) {
 			glUseProgramObjectARB( mShader );
 			mUse = apply!=0;
-			Py_RETURN_NONE;
+			return PyBool_FromLong(true);
 		}
 		mVertProg = "";
+		mGeomProg = "";
 		mFragProg = "";
 		mUse = false;
-		Py_RETURN_NONE;
+		return PyBool_FromLong(false);
+	}
+	return NULL;
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, setVGFSource," setSource(vertexProgram, geometryProgram, fragmentProgram)" )
+{
+	if (mShader !=0 && mOk  )
+	{
+		// already set...
+		return PyBool_FromLong(false);
+	}
+	char *v,*g,*f;
+	int apply=0;
+	if ( PyArg_ParseTuple(args, "sssi:setSource", &v, &g, &f, &apply) )
+	{
+		mVertProg = std::string(v);
+		mGeomProg = std::string(g);
+		mFragProg = std::string(f);
+		if ( LinkProgram() ) {
+			glUseProgramObjectARB( mShader );
+			mUse = apply!=0;
+			return PyBool_FromLong(true);
+		}
+		mVertProg = "";
+		mGeomProg = "";
+		mFragProg = "";
+		mUse = false;
+		return PyBool_FromLong(false);
 	}
 	return NULL;
 }
@@ -895,6 +931,11 @@ KX_PYMETHODDEF_DOC( BL_Shader, isValid, "isValid()" )
 KX_PYMETHODDEF_DOC( BL_Shader, getVertexProg, "getVertexProg( )" )
 {
 	return PyUnicode_FromString(mVertProg.c_str());
+}
+
+KX_PYMETHODDEF_DOC( BL_Shader, getGeometryProg, "getGeometryProg( )" )
+{
+	return PyUnicode_FromString(mGeomProg.c_str());
 }
 
 KX_PYMETHODDEF_DOC( BL_Shader, getFragmentProg, "getFragmentProg( )" )
