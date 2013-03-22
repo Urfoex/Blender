@@ -359,7 +359,10 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		nsock->locx = locx + NODE_WIDTH(node);
 		/* place the socket circle in the middle of the layout */
 		nsock->locy = 0.5f * (dy + buty);
+		
 		dy = buty;
+		if (nsock->next)
+			dy -= NODE_SOCKDY;
 	}
 
 	node->prvr.xmin = locx + NODE_DYS;
@@ -443,7 +446,10 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		nsock->locx = locx;
 		/* place the socket circle in the middle of the layout */
 		nsock->locy = 0.5f * (dy + buty);
+		
 		dy = buty;
+		if (nsock->next)
+			dy -= NODE_SOCKDY;
 	}
 	
 	/* little bit space in end */
@@ -1155,7 +1161,7 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
 	
 	/* draw foreground nodes, last nodes in front */
 	for (a = 0, node = ntree->nodes.first; node; node = node->next, a++) {
-		bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
+		bNodeInstanceKey key;
 		if (node->flag & NODE_BACKGROUND)
 			continue;
 

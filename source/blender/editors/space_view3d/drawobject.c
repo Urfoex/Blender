@@ -603,9 +603,15 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 	glScalef(scale * sca_x, scale * sca_y, 1.0f);
 
 	if (ibuf && ibuf->rect) {
+		const bool use_clip = (U.glalphaclip != 1.0f);
 		/* Setup GL params */
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA);
+
+		if (use_clip) {
+			glEnable(GL_ALPHA_TEST);
+			glAlphaFunc(GL_GREATER, U.glalphaclip);
+		}
 
 		/* Use the object color and alpha */
 		glColor4fv(ob->col);
@@ -615,6 +621,11 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 		glPixelTransferf(GL_ALPHA_SCALE, 1.0f);
 
 		glDisable(GL_BLEND);
+
+		if (use_clip) {
+			glDisable(GL_ALPHA_TEST);
+			glAlphaFunc(GL_GREATER, 0.0f);
+		}
 	}
 
 	if ((dflag & DRAW_CONSTCOLOR) == 0) {
@@ -1398,20 +1409,22 @@ static void drawlamp(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 	}
 }
 
-static void draw_limit_line(float sta, float end, unsigned int col)
+static void draw_limit_line(float sta, float end, const short dflag, unsigned int col)
 {
 	glBegin(GL_LINES);
 	glVertex3f(0.0, 0.0, -sta);
 	glVertex3f(0.0, 0.0, -end);
 	glEnd();
 
-	glPointSize(3.0);
-	glBegin(GL_POINTS);
-	cpack(col);
-	glVertex3f(0.0, 0.0, -sta);
-	glVertex3f(0.0, 0.0, -end);
-	glEnd();
-	glPointSize(1.0);
+	if (!(dflag & DRAW_PICKING)) {
+		glPointSize(3.0);
+		glBegin(GL_POINTS);
+		cpack(col);
+		glVertex3f(0.0, 0.0, -sta);
+		glVertex3f(0.0, 0.0, -end);
+		glEnd();
+		glPointSize(1.0);
+	}
 }
 
 
@@ -1752,10 +1765,9 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 		glEnd();
 	}
 
-	if (dflag == 0) {
-		if (cam->flag & (CAM_SHOWLIMITS + CAM_SHOWMIST)) {
+	if ((dflag & DRAW_SCENESET) == 0) {
+		if (cam->flag & (CAM_SHOWLIMITS | CAM_SHOWMIST)) {
 			float nobmat[4][4];
-			World *wrld;
 
 			/* draw in normalized object matrix space */
 			copy_m4_m4(nobmat, ob->obmat);
@@ -1766,15 +1778,17 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 			glMultMatrixf(nobmat);
 
 			if (cam->flag & CAM_SHOWLIMITS) {
-				draw_limit_line(cam->clipsta, cam->clipend, 0x77FFFF);
+				draw_limit_line(cam->clipsta, cam->clipend, dflag, 0x77FFFF);
 				/* qdn: was yafray only, now also enabled for Blender to be used with defocus composite node */
 				draw_focus_cross(BKE_camera_object_dof_distance(ob), cam->drawsize);
 			}
 
-			wrld = scene->world;
-			if (cam->flag & CAM_SHOWMIST)
-				if (wrld) draw_limit_line(wrld->miststa, wrld->miststa + wrld->mistdist, 0xFFFFFF);
-
+			if (cam->flag & CAM_SHOWMIST) {
+				World *world = scene->world;
+				if (world) {
+					draw_limit_line(world->miststa, world->miststa + world->mistdist, dflag, 0xFFFFFF);
+				}
+			}
 			glPopMatrix();
 		}
 	}
