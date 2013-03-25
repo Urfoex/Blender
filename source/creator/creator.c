@@ -1413,6 +1413,11 @@ char **environ = NULL;
 #  endif
 #endif
 
+#include <GL/glew.h>
+GLEWContext* G_OpenGL_Context;
+
+// #include "../../creator/goglcontext.h"
+
 
 #ifdef WIN32
 int main(int argc, const char **UNUSED(argv_c)) /* Do not mess with const */
@@ -1420,6 +1425,8 @@ int main(int argc, const char **UNUSED(argv_c)) /* Do not mess with const */
 int main(int argc, const char **argv)
 #endif
 {
+	
+	
 	bContext *C = CTX_create();
 	SYS_SystemHandle syshandle;
 
@@ -1436,7 +1443,9 @@ int main(int argc, const char **argv)
 	}
 	LocalFree(argv_16);
 #endif
-
+	printf("Staring Blender ...\n");
+	G_OpenGL_Context = malloc(sizeof(GLEWContext));// GLEWContext();	
+	
 #ifdef WITH_PYTHON_MODULE
 #ifdef __APPLE__
 	environ = *_NSGetEnviron();
@@ -1602,6 +1611,7 @@ int main(int argc, const char **argv)
 #endif
 
 #ifdef WITH_PYTHON_MODULE
+	free( G_OpenGL_Context);
 	return 0; /* keep blender in background mode running */
 #endif
 
@@ -1611,8 +1621,10 @@ int main(int argc, const char **argv)
 	}
 	else {
 		if ((G.fileflags & G_FILE_AUTOPLAY) && (G.f & G_SCRIPT_AUTOEXEC)) {
-			if (WM_init_game(C))
+			if (WM_init_game(C)){
+				free (G_OpenGL_Context);
 				return 0;
+			}
 		}
 		else if (!G.file_loaded) {
 			WM_init_splash(C);
@@ -1621,6 +1633,7 @@ int main(int argc, const char **argv)
 
 	WM_main(C);
 
+	free( G_OpenGL_Context);
 	return 0;
 } /* end of int main(argc, argv)	*/
 

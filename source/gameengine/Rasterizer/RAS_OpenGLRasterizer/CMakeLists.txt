@@ -39,26 +39,22 @@ set(INC
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+	${}
 )
 
 set(SRC
 	RAS_GLExtensionManager.cpp
 	RAS_ListRasterizer.cpp
 	RAS_OpenGLRasterizer.cpp
-	RAS_StorageIM.cpp
-	RAS_StorageVA.cpp
 	RAS_StorageVBO.cpp
 
 	RAS_GLExtensionManager.h
 	RAS_IStorage.h
 	RAS_ListRasterizer.h
 	RAS_OpenGLRasterizer.h
-	RAS_StorageIM.h
-	RAS_StorageVA.h
 	RAS_StorageVBO.h
 )
 
-add_definitions(-DGLEW_STATIC)
+add_definitions(-DGLEWMX_STATIC)
 
 blender_add_lib(ge_oglrasterizer "${SRC}" "${INC}" "${INC_SYS}")

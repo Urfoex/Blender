@@ -151,6 +151,8 @@ void KX_BlenderMaterial::ReleaseMaterial()
 		mBlenderShader->ReloadMaterial();
 }
 
+#include "../../creator/goglcontext.h"
+
 void KX_BlenderMaterial::InitTextures()
 {
 	// for each unique material...

@@ -300,6 +300,7 @@ PyObject *Texture_close(Texture * self)
 	Py_RETURN_NONE;
 }
 
+#include "../../creator/goglcontext.h"
 
 // refresh texture
 static PyObject *Texture_refresh(Texture *self, PyObject *args)

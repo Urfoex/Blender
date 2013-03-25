@@ -271,7 +271,7 @@ blender_include_dirs(
 )
 
 blender_include_dirs_sys(
-	${GLEW_INCLUDE_PATH}
+	${GLEWMX_INCLUDE_DIRS}
 )
 
 add_executable(makesrna ${SRC} ${SRC_RNA_INC} ${SRC_DNA_INC})

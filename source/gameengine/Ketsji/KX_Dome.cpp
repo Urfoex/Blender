@@ -334,6 +334,8 @@ bool KX_Dome::CreateDL()
 	return true;
 }
 
+#include "../../creator/goglcontext.h"
+
 bool KX_Dome::CreateFBO(void)
 {
 	if (!GLEW_EXT_framebuffer_object)

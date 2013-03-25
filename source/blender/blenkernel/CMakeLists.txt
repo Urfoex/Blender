@@ -50,7 +50,7 @@ set(INC
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+	${}
 	${ZLIB_INCLUDE_DIRS}
 )
 
@@ -250,7 +250,7 @@ set(SRC
 	intern/pbvh_intern.h
 )
 
-add_definitions(-DGLEW_STATIC)
+add_definitions(-DGLEWMX_STATIC)
 
 if(WITH_AUDASPACE)
 	list(APPEND INC

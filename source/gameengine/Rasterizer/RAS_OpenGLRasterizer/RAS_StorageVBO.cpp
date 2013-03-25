@@ -101,6 +101,8 @@ void VBO::UpdateIndices()
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, space, &data->m_index[0], GL_STATIC_DRAW);
 }
 
+#include "../../creator/goglcontext.h"
+
 void VBO::Draw(int texco_num, RAS_IRasterizer::TexCoGen* texco, int attrib_num, RAS_IRasterizer::TexCoGen* attrib, int *attrib_layer, bool multi)
 {
 	int unit;

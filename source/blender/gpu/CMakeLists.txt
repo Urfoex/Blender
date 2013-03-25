@@ -42,7 +42,7 @@ set(INC
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+	${}
 )
 
 set(SRC
@@ -74,7 +74,7 @@ if(WITH_MOD_SMOKE)
 	add_definitions(-DWITH_SMOKE)
 endif()
 
-add_definitions(-DGLEW_STATIC)
+add_definitions(-DGLEWMX_STATIC)
 
 if(WITH_IMAGE_DDS)
 	add_definitions(-DWITH_DDS)

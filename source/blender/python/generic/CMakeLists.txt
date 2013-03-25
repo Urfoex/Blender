@@ -28,7 +28,7 @@ set(INC
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+	${}
 	${PYTHON_INCLUDE_DIRS}
 )
 
@@ -46,6 +46,6 @@ set(SRC
 	py_capi_utils.h
 )
 
-add_definitions(-DGLEW_STATIC)
+add_definitions(-DGLEWMX_STATIC)
 
 blender_add_lib(bf_python_ext "${SRC}" "${INC}" "${INC_SYS}")

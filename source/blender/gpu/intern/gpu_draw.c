@@ -230,6 +230,7 @@ static struct GPUTextureState {
 } GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, 0, -1, 1.f, 0, NULL};
 
 /* Mipmap settings */
+#include "../../creator/goglcontext.h"
 
 void GPU_set_gpu_mipmapping(int gpu_mipmap)
 {

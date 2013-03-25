@@ -665,6 +665,8 @@ static char *code_generate_vertex(ListBase *nodes)
 	return code;
 }
 
+#include "../../creator//goglcontext.h"
+
 int GPU_bicubic_bump_support(void)
 {
 	return GLEW_ARB_texture_query_lod && GLEW_VERSION_3_0;

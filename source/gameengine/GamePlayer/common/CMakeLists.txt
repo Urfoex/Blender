@@ -53,7 +53,7 @@ set(INC
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+	${}
 	${PYTHON_INCLUDE_DIRS}
 	${PNG_INCLUDE_DIR}
 	${ZLIB_INCLUDE_DIRS}
@@ -82,6 +82,6 @@ set(SRC
 	GPC_System.h
 )
 
-add_definitions(-DGLEW_STATIC)
+add_definitions(-DGLEWMX_STATIC)
 
 blender_add_lib_nolist(ge_player_common "${SRC}" "${INC}" "${INC_SYS}")

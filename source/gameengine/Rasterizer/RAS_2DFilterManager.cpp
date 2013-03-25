@@ -50,6 +50,8 @@
 
 #include "Value.h"
 
+#include "../../creator/goglcontext.h"
+
 RAS_2DFilterManager::RAS_2DFilterManager():
 texturewidth(-1), textureheight(-1),
 /* numberoffilters(0), */ /* UNUSED */ need_tex_update(true)

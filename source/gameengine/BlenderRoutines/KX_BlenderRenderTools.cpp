@@ -114,6 +114,8 @@ void KX_BlenderRenderTools::ProcessLighting(RAS_IRasterizer *rasty, bool useligh
 		DisableOpenGLLights();
 }
 
+#include "../../creator/goglcontext.h"
+
 void KX_BlenderRenderTools::EnableOpenGLLights(RAS_IRasterizer *rasty)
 {
 	if (m_lastlighting == true)
