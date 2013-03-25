@@ -534,7 +534,7 @@ const STR_String& GPG_Application::getExitString(void)
 	return m_exitString;
 }
 
-
+#include "../../creator/goglcontext.h"
 
 bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 {
