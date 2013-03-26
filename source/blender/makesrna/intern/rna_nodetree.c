@@ -69,15 +69,15 @@ EnumPropertyItem node_socket_in_out_items[] = {
 };
 
 EnumPropertyItem node_socket_type_items[] = {
-    {SOCK_CUSTOM,  "CUSTOM",    0,    "Custom",    ""},
-    {SOCK_FLOAT,   "VALUE",     0,    "Value",     ""},
-    {SOCK_INT,     "INT",       0,    "Int",       ""},
-    {SOCK_BOOLEAN, "BOOLEAN",   0,    "Boolean",   ""},
-    {SOCK_VECTOR,  "VECTOR",    0,    "Vector",    ""},
-    {SOCK_STRING,  "STRING",    0,    "String",    ""},
-    {SOCK_RGBA,    "RGBA",      0,    "RGBA",      ""},
-    {SOCK_SHADER,  "SHADER",    0,    "Shader",    ""},
-    {0, NULL, 0, NULL, NULL}
+	{SOCK_CUSTOM,  "CUSTOM",    0,    "Custom",    ""},
+	{SOCK_FLOAT,   "VALUE",     0,    "Value",     ""},
+	{SOCK_INT,     "INT",       0,    "Int",       ""},
+	{SOCK_BOOLEAN, "BOOLEAN",   0,    "Boolean",   ""},
+	{SOCK_VECTOR,  "VECTOR",    0,    "Vector",    ""},
+	{SOCK_STRING,  "STRING",    0,    "String",    ""},
+	{SOCK_RGBA,    "RGBA",      0,    "RGBA",      ""},
+	{SOCK_SHADER,  "SHADER",    0,    "Shader",    ""},
+	{0, NULL, 0, NULL, NULL}
 };
 
 EnumPropertyItem node_quality_items[] = {
@@ -2305,7 +2305,7 @@ static void rna_NodeSocketStandard_float_range(PointerRNA *ptr, float *min, floa
 static void rna_NodeSocketStandard_int_range(PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
 {
 	bNodeSocket *sock = ptr->data;
-	bNodeSocketValueFloat *dval = sock->default_value;
+	bNodeSocketValueInt *dval = sock->default_value;
 	int subtype = sock->typeinfo->subtype;
 	
 	*min = (subtype == PROP_UNSIGNED ? 0 : INT_MIN);

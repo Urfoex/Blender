@@ -146,6 +146,7 @@
 #include "BKE_screen.h"
 #include "BKE_sequencer.h"
 #include "BKE_text.h" // for txt_extended_ascii_as_utf8
+#include "BKE_texture.h"
 #include "BKE_tracking.h"
 #include "BKE_sound.h"
 
@@ -1019,7 +1020,7 @@ static int fd_read_gzip_from_memory(FileData *filedata, void *buffer, unsigned i
 	if (err == Z_STREAM_END) {
 		return 0;
 	}
-	else if (err != Z_OK)  {
+	else if (err != Z_OK) {
 		printf("fd_read_gzip_from_memory: zlib error\n");
 		return 0;
 	}
@@ -1811,6 +1812,7 @@ static void lib_link_brush(FileData *fd, Main *main)
 			brush->id.flag -= LIB_NEED_LINK;
 			
 			brush->mtex.tex = newlibadr_us(fd, brush->id.lib, brush->mtex.tex);
+			brush->mask_mtex.tex = newlibadr_us(fd, brush->id.lib, brush->mask_mtex.tex);
 			brush->clone.image = newlibadr_us(fd, brush->id.lib, brush->clone.image);
 		}
 	}
@@ -7558,10 +7560,21 @@ static void do_versions_userdef(FileData *fd, BlendFileData *bfd)
 	
 	if (user == NULL) return;
 	
+	if (MAIN_VERSION_OLDER(bmain, 266, 4)) {
+		bTheme *btheme;
+		
+		/* themes for Node and Sequence editor were not using grid color, but back. we copy this over then */
+		for (btheme = user->themes.first; btheme; btheme = btheme->next) {
+			copy_v4_v4_char(btheme->tnode.grid, btheme->tnode.back);
+			copy_v4_v4_char(btheme->tseq.grid, btheme->tseq.back);
+		}
+	}
+	
 	if (bmain->versionfile < 267) {
 	
 		if (!DNA_struct_elem_find(fd->filesdna, "UserDef", "short", "image_gpubuffer_limit"))
-			user->image_gpubuffer_limit = 10;
+			user->image_gpubuffer_limit = 20;
+		
 	}
 }
 static void do_versions(FileData *fd, Library *lib, Main *main)
@@ -8974,13 +8987,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		} FOREACH_NODETREE_END
 	}
 
-	if (!MAIN_VERSION_ATLEAST(main, 266, 2)) {
+	if (MAIN_VERSION_OLDER(main, 266, 2)) {
 		FOREACH_NODETREE(main, ntree, id) {
 			do_versions_nodetree_customnodes(ntree, ((ID *)ntree == id));
 		} FOREACH_NODETREE_END
 	}
 
-	if (!MAIN_VERSION_ATLEAST(main, 266, 2)) {
+	if (MAIN_VERSION_OLDER(main, 266, 2)) {
 		bScreen *sc;
 		for (sc= main->screen.first; sc; sc= sc->id.next) {
 			ScrArea *sa;
@@ -9028,13 +9041,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			
 			/* Only add interface nodes once.
 			 * In old Blender versions they will be removed automatically due to undefined type */
-			if (!MAIN_VERSION_ATLEAST(main, 266, 2))
+			if (MAIN_VERSION_OLDER(main, 266, 2))
 				ntree->flag |= NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE;
 		}
 		FOREACH_NODETREE_END
 	}
 
-	if (!MAIN_VERSION_ATLEAST(main, 266, 3)) {
+	if (MAIN_VERSION_OLDER(main, 266, 3)) {
 		{
 			/* Fix for a very old issue:
 			 * Node names were nominally made unique in r24478 (2.50.8), but the do_versions check
@@ -9051,6 +9064,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					nodeUniqueName(ntree, node);
 			}
 			FOREACH_NODETREE_END
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 266, 4)) {
+		Brush *brush;
+		for (brush = main->brush.first; brush; brush = brush->id.next) {
+			default_mtex(&brush->mask_mtex);
 		}
 	}
 
@@ -10490,13 +10510,13 @@ static ID *append_named_part_ex(const bContext *C, Main *mainl, FileData *fd, co
 	return id;
 }
 
-ID *BLO_library_append_named_part(Main *mainl, BlendHandle** bh, const char *idname, const int idcode)
+ID *BLO_library_append_named_part(Main *mainl, BlendHandle **bh, const char *idname, const int idcode)
 {
 	FileData *fd = (FileData*)(*bh);
 	return append_named_part(mainl, fd, idname, idcode);
 }
 
-ID *BLO_library_append_named_part_ex(const bContext *C, Main *mainl, BlendHandle** bh, const char *idname, const int idcode, const short flag)
+ID *BLO_library_append_named_part_ex(const bContext *C, Main *mainl, BlendHandle **bh, const char *idname, const int idcode, const short flag)
 {
 	FileData *fd = (FileData*)(*bh);
 	return append_named_part_ex(C, mainl, fd, idname, idcode, flag);
@@ -10544,7 +10564,7 @@ static Main *library_append_begin(Main *mainvar, FileData **fd, const char *file
 	return mainl;
 }
 
-Main *BLO_library_append_begin(Main *mainvar, BlendHandle** bh, const char *filepath)
+Main *BLO_library_append_begin(Main *mainvar, BlendHandle **bh, const char *filepath)
 {
 	FileData *fd = (FileData*)(*bh);
 	return library_append_begin(mainvar, &fd, filepath);
@@ -10618,7 +10638,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 	}
 }
 
-void BLO_library_append_end(const bContext *C, struct Main *mainl, BlendHandle** bh, int idcode, short flag)
+void BLO_library_append_end(const bContext *C, struct Main *mainl, BlendHandle **bh, int idcode, short flag)
 {
 	FileData *fd = (FileData*)(*bh);
 	library_append_end(C, mainl, &fd, idcode, flag);

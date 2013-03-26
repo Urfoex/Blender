@@ -792,7 +792,7 @@ int nodeFindNode(bNodeTree *ntree, bNodeSocket *sock, bNode **nodep, int *sockin
 /* Find the first available, non-duplicate name for a given node */
 void nodeUniqueName(bNodeTree *ntree, bNode *node)
 {
-	BLI_uniquename(&ntree->nodes, node, "Node", '.', offsetof(bNode, name), sizeof(node->name));
+	BLI_uniquename(&ntree->nodes, node, DATA_("Node"), '.', offsetof(bNode, name), sizeof(node->name));
 }
 
 bNode *nodeAddNode(const struct bContext *C, bNodeTree *ntree, const char *idname)
@@ -1349,7 +1349,7 @@ static void node_preview_init_tree_recursive(bNodeInstanceHash *previews, bNodeT
 			BKE_node_preview_verify(previews, key, xsize, ysize, create);
 		}
 		
-		if (node->type == NODE_GROUP)
+		if (node->type == NODE_GROUP && node->id)
 			node_preview_init_tree_recursive(previews, (bNodeTree *)node->id, key, xsize, ysize, create);
 	}
 }
@@ -1374,7 +1374,7 @@ static void node_preview_tag_used_recursive(bNodeInstanceHash *previews, bNodeTr
 		if (BKE_node_preview_used(node))
 			BKE_node_instance_hash_tag_key(previews, key);
 		
-		if (node->type == NODE_GROUP)
+		if (node->type == NODE_GROUP && node->id)
 			node_preview_tag_used_recursive(previews, (bNodeTree *)node->id, key);
 	}
 }
