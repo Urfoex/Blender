@@ -43,8 +43,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-#include "../../creator/goglcontext.h"
+#include "GL/glew.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -92,6 +91,7 @@ void BL_SwapBuffers(wmWindow *win)
 	wm_window_swap_buffers(win);
 }
 
+#include "../../creator/goglcontext.h"
 
 static void DisableForText()
 {

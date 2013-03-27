@@ -58,6 +58,7 @@
 
 #include "RAS_GLExtensionManager.h"
 #include "RAS_OpenGLRasterizer.h"
+#include "RAS_ListRasterizer.h"
 
 #include "NG_LoopBackNetworkDeviceInterface.h"
 
