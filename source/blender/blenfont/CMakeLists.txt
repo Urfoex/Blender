@@ -36,7 +36,7 @@ set(INC
 )
 
 set(INC_SYS
-	${}
+	${GLEW_INCLUDE_PATH}
 	${FREETYPE_INCLUDE_DIRS}
 )
 
@@ -59,7 +59,7 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 blender_add_lib(bf_blenfont "${SRC}" "${INC}" "${INC_SYS}")
 

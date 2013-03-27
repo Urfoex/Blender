@@ -48,10 +48,10 @@ set(INC
 )
 
 set(INC_SYS
-	${}
+	${GLEW_INCLUDE_PATH}
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 set(SRC
 	Exception.cpp

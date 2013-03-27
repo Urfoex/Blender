@@ -1869,17 +1869,16 @@ endif()
 # Configure GLEW
 
 if(WITH_SYSTEM_GLEW)
-	find_package(GLEWMX)
+	find_package(GLEW)
 
-	if(NOT GLEWMX_FOUND)
-		message(FATAL_ERROR "GLEWMX is required to build blender, install it or disable WITH_SYSTEM_GLEW")
+	if(NOT GLEW_FOUND)
+		message(FATAL_ERROR "GLEW is required to build blender, install it or disable WITH_SYSTEM_GLEW")
 	endif()
 
 	mark_as_advanced(
-		GLEWMX_LIBRARY
-		GLEWMX_INCLUDE_DIRS
+		GLEW_LIBRARY
+		GLEW_INCLUDE_PATH
 	)
-	add_definitions(-DGLEW_MX)
 else()
 	# set(GLEW_LIBRARY "")  # unused
 	set(GLEW_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/extern/glew/include")

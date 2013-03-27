@@ -31,7 +31,7 @@ set(INC
 
 set(INC_SYS
 	${PTHREADS_INCLUDE_DIRS}
-	${}
+	${GLEW_INCLUDE_PATH}
 	${BOOST_INCLUDE_DIR}
 )
 
@@ -56,7 +56,7 @@ set(SRC
 	KX_BlenderSystem.h
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 if(WITH_AUDASPACE)
 	list(APPEND INC

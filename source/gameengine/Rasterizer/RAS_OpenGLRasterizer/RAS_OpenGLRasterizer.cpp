@@ -43,6 +43,8 @@
 #include "MT_CmMatrix4x4.h"
 #include "RAS_IRenderTools.h" // rendering text
 
+#include "RAS_StorageIM.h"
+#include "RAS_StorageVA.h"
 #include "RAS_StorageVBO.h"
 
 #include "GPU_draw.h"
@@ -112,10 +114,23 @@ RAS_OpenGLRasterizer::RAS_OpenGLRasterizer(RAS_ICanvas* canvas, int storage)
 
 	m_prevafvalue = GPU_get_anisotropic();
 
-	assert (m_storage_type == RAS_VBO);
+	if (m_storage_type == RAS_VBO /*|| m_storage_type == RAS_AUTO_STORAGE && GLEW_ARB_vertex_buffer_object*/)
+	{
 		m_storage = new RAS_StorageVBO(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_failsafe_storage = new RAS_StorageVBO(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
+		m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
 		m_storage_type = RAS_VBO;
+	}
+	else if ((m_storage_type == RAS_VA) || (m_storage_type == RAS_AUTO_STORAGE && GLEW_VERSION_1_1))
+	{
+		m_storage = new RAS_StorageVA(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
+		m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
+		m_storage_type = RAS_VA;
+	}
+	else
+	{
+		m_storage = m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
+		m_storage_type = RAS_IMMEDIATE;
+	}
 }
 
 
@@ -279,7 +294,7 @@ bool RAS_OpenGLRasterizer::SetMaterial(const RAS_IPolyMaterial& mat)
 	return mat.Activate(this, m_materialCachingInfo);
 }
 
-#include "../../creator/goglcontext.h"
+
 
 void RAS_OpenGLRasterizer::Exit()
 {

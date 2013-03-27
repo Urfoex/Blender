@@ -56,7 +56,7 @@ set(INC
 
 set(INC_SYS
 	${PTHREADS_INCLUDE_DIRS}
-	${}
+	${GLEW_INCLUDE_PATH}
 	${BOOST_INCLUDE_DIR}
 	../../../extern/recastnavigation/Recast/Include
 	../../../extern/recastnavigation/Detour/Include
@@ -236,7 +236,7 @@ set(SRC
 
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 if(WITH_IMAGE_DDS)
 	add_definitions(-DWITH_DDS)

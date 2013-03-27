@@ -207,9 +207,6 @@ static int BL_KetsjiPyNextFrame(void *state0)
 		state->draw_letterbox);
 }
 
-#define glewGetContext() G_OpenGL_Context
-GLEWContext* G_OpenGL_Context;
-
 extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *cam_frame, int always_use_expand_framing)
 {
 	/* context values */

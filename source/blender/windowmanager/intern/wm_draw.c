@@ -422,8 +422,6 @@ static void wm_draw_triple_fail(bContext *C, wmWindow *win)
 	wm_method_draw_overlap_all(C, win, 0);
 }
 
-#include "../../creator//goglcontext.h"
-
 static int wm_triple_gen_textures(wmWindow *win, wmDrawTriple *triple)
 {
 	GLint maxsize;

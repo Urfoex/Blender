@@ -38,7 +38,7 @@ set(INC
 )
 
 set(INC_SYS
-	${}
+	${GLEW_INCLUDE_PATH}
 	${PYTHON_INCLUDE_DIRS}
 )
 
@@ -83,6 +83,6 @@ set(SRC
 	RAS_OpenGLFilters/RAS_Sobel2DFilter.h
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 blender_add_lib(ge_rasterizer "${SRC}" "${INC}" "${INC_SYS}")

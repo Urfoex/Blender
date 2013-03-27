@@ -54,7 +54,7 @@ set(INC
 )
 
 set(INC_SYS
-	${}
+	${GLEW_INCLUDE_PATH}
 	${PYTHON_INCLUDE_DIRS}
 )
 
@@ -71,7 +71,7 @@ set(SRC
 	GPG_System.h
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 if(WITH_CODEC_FFMPEG)
 	add_definitions(-DWITH_FFMPEG)

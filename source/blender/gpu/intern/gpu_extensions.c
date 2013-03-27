@@ -106,8 +106,6 @@ void GPU_extensions_disable(void)
 {
 	GG.extdisabled = 1;
 }
-                                      
-#include "../../creator//goglcontext.h"
 
 void GPU_extensions_init(void)
 {

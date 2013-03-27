@@ -36,7 +36,7 @@ set(INC
 )
 
 set(INC_SYS
-	${}
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -70,7 +70,7 @@ if(WITH_GAMEENGINE)
 	add_definitions(-DWITH_GAMEENGINE)
 endif()
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)

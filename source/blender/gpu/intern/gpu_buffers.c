@@ -97,8 +97,6 @@ typedef struct GPUBufferPool {
 } GPUBufferPool;
 #define MAX_FREE_GPU_BUFFERS 8
 
-#include "../../creator//goglcontext.h"
-
 /* create a new GPUBufferPool */
 static GPUBufferPool *gpu_buffer_pool_new(void)
 {

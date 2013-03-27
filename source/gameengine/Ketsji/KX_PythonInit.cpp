@@ -601,8 +601,6 @@ static PyObject *pyPrintStats(PyObject *,PyObject *,PyObject *)
 	Py_RETURN_NONE;
 }
 
-#include "../../creator/goglcontext.h"
-
 static PyObject *pyPrintExt(PyObject *,PyObject *,PyObject *)
 {
 #define pprint(x) std::cout << x << std::endl;

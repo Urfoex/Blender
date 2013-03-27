@@ -34,8 +34,6 @@
 
 #include "RAS_GLExtensionManager.h"
 
-#include "../../creator/goglcontext.h"
-
 namespace bgl
 {
 	void InitExtensions(bool debug)

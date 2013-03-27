@@ -83,7 +83,6 @@ endif()
 # Setup the exe sources and buildinfo
 set(SRC
 	creator.c
-	goglcontext.h
 )
 
 # MSVC 2010 gives linking errors with the manifest
@@ -996,7 +995,7 @@ endif()
 		list(SORT REM_MSG)
 		message(STATUS "Blender Skipping: (${REM_MSG})")
 	endif()
-	target_link_libraries(blender ${BLENDER_SORTED_LIBS} ${GLEWMX_LIBRARIES})
+	target_link_libraries(blender ${BLENDER_SORTED_LIBS})
 
 	unset(SEARCHLIB)
 	unset(SORTLIB)

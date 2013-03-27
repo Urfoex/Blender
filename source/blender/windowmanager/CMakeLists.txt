@@ -49,7 +49,7 @@ set(INC
 set(INC_SYS
 	${ZLIB_INCLUDE_DIRS}
 	${OPENGL_INCLUDE_DIR}
-	${}
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -81,7 +81,7 @@ set(SRC
 	wm_window.h
 )
 
-add_definitions(-DGLEWMX_STATIC)
+add_definitions(-DGLEW_STATIC)
 
 if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)

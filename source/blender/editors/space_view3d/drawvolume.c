@@ -115,8 +115,6 @@ static bool convex(const float p0[3], const float up[3], const float a[3], const
 	return dot_v3v3(up, tmp) >= 0;
 }
 
-#include "../../creator/goglcontext.h"
-
 void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
                        GPUTexture *tex, float min[3], float max[3],
                        int res[3], float dx, float UNUSED(base_scale), float viewnormal[3],
@@ -366,7 +364,7 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	// printf("i: %d\n", i);
 	// printf("point %f, %f, %f\n", cv[i][0], cv[i][1], cv[i][2]);
 
-	if (GL_TRUE == glewContextIsSupported(G_OpenGL_Context,"GL_ARB_fragment_program")) {
+	if (GL_TRUE == glewIsSupported("GL_ARB_fragment_program")) {
 		glEnable(GL_FRAGMENT_PROGRAM_ARB);
 		glGenProgramsARB(1, &prog);
 

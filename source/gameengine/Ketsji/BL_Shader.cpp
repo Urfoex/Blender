@@ -309,8 +309,6 @@ int BL_Shader::BuildShader(int shaderType, std::string shaderTypeName, std::stri
 	return tmpVert;
 }
 
-#include "../../creator/goglcontext.h"
-
 bool BL_Shader::LinkProgram()
 {
 	int proglen = 0;
