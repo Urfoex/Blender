@@ -43,8 +43,6 @@
 #include "MT_CmMatrix4x4.h"
 #include "RAS_IRenderTools.h" // rendering text
 
-#include "RAS_StorageIM.h"
-#include "RAS_StorageVA.h"
 #include "RAS_StorageVBO.h"
 
 #include "GPU_draw.h"
@@ -114,23 +112,8 @@ RAS_OpenGLRasterizer::RAS_OpenGLRasterizer(RAS_ICanvas* canvas, int storage)
 
 	m_prevafvalue = GPU_get_anisotropic();
 
-	if (m_storage_type == RAS_VBO /*|| m_storage_type == RAS_AUTO_STORAGE && GLEW_ARB_vertex_buffer_object*/)
-	{
-		m_storage = new RAS_StorageVBO(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_storage_type = RAS_VBO;
-	}
-	else if ((m_storage_type == RAS_VA) || (m_storage_type == RAS_AUTO_STORAGE && GLEW_VERSION_1_1))
-	{
-		m_storage = new RAS_StorageVA(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_storage_type = RAS_VA;
-	}
-	else
-	{
-		m_storage = m_failsafe_storage = new RAS_StorageIM(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
-		m_storage_type = RAS_IMMEDIATE;
-	}
+	m_storage = new RAS_StorageVBO(&m_texco_num, m_texco, &m_attrib_num, m_attrib, m_attrib_layer);
+	m_storage_type = RAS_VBO;
 }
 
 
@@ -139,8 +122,6 @@ RAS_OpenGLRasterizer::~RAS_OpenGLRasterizer()
 {
 	// Restore the previous AF value
 	GPU_set_anisotropic(m_prevafvalue);
-	if (m_failsafe_storage && m_failsafe_storage != m_storage)
-		delete m_failsafe_storage;
 
 	if (m_storage)
 		delete m_storage;
@@ -364,9 +345,6 @@ void RAS_OpenGLRasterizer::SetDrawingMode(int drawingmode)
 		glDisable(GL_CULL_FACE);
 
 	m_storage->SetDrawingMode(drawingmode);
-	if (m_failsafe_storage && m_failsafe_storage != m_storage) {
-		m_failsafe_storage->SetDrawingMode(drawingmode);
-	}
 }
 
 int RAS_OpenGLRasterizer::GetDrawingMode()
@@ -751,17 +729,19 @@ void RAS_OpenGLRasterizer::SetAttrib(TexCoGen coords, int unit, int layer)
 
 void RAS_OpenGLRasterizer::IndexPrimitives(RAS_MeshSlot& ms)
 {
-	if (ms.m_pDerivedMesh)
-		m_failsafe_storage->IndexPrimitives(ms);
-	else
+	// TODO: is this important? std::clog << "(!!) failsafe storage derived mesh\n";
+// 	if (ms.m_pDerivedMesh)
+// 		m_failsafe_storage->IndexPrimitives(ms);
+// 	else
 		m_storage->IndexPrimitives(ms);
 }
 
 void RAS_OpenGLRasterizer::IndexPrimitivesMulti(RAS_MeshSlot& ms)
 {
-	if (ms.m_pDerivedMesh)
-		m_failsafe_storage->IndexPrimitivesMulti(ms);
-	else
+	// TODO: is this important? std::clog << "(!!) failsafe storage derived mesh multi\n";
+// 	if (ms.m_pDerivedMesh)
+// 		m_failsafe_storage->IndexPrimitivesMulti(ms);
+// 	else
 		m_storage->IndexPrimitivesMulti(ms);
 }
 
