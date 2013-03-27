@@ -36,7 +36,6 @@ set(INC_SYS
 )
 
 set(SRC
-	 qgamewindow.cpp
 	BL_KetsjiEmbedStart.cpp
 	BL_System.cpp
 	KX_BlenderCanvas.cpp
@@ -46,9 +45,7 @@ set(SRC
 	KX_BlenderMouseDevice.cpp
 	KX_BlenderRenderTools.cpp
 	KX_BlenderSystem.cpp
-	 
 
-	 qgamewindow.h
 	BL_System.h
 	KX_BlenderCanvas.h
 	KX_BlenderGL.h
@@ -57,7 +54,6 @@ set(SRC
 	KX_BlenderMouseDevice.h
 	KX_BlenderRenderTools.h
 	KX_BlenderSystem.h
-	 
 )
 
 add_definitions(-DGLEWMX_STATIC)
@@ -81,24 +77,4 @@ if(WITH_BULLET)
 endif()
 
 
-set(CMAKE_AUTOMOC ON)
-
-# find_package(Qt5Core)
-find_package(Qt5Gui)
-find_package(Qt5Concurrent)
-
-# set_target_properties(Qt5::Core PROPERTIES MAP_IMPORTED_CONFIG_COVERAGE "RELEASE")
-# set_target_properties(Qt5::Gui PROPERTIES MAP_IMPORTED_CONFIG_COVERAGE "RELEASE")
-
-# include_directories(${Qt5Gui_INCLUDE_DIRS})
-include_directories(${Qt5Concurrent_INCLUDE_DIRS})
-# add_definitions(${Qt5Gui_DEFINITIONS})
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5ui_EXECUTABLE_COMPILE_FLAGS}")
-
-
-#//blender_include_dirs(${Qt5Gui_INCLUDE_DIRS})
 blender_add_lib(ge_blen_routines "${SRC}" "${INC}" "${INC_SYS}")
-
-
-# target_link_libraries(ge_blen_routines ${Qt5Gui_LIBRARIES})
-qt5_use_modules(ge_blen_routines Gui Concurrent)

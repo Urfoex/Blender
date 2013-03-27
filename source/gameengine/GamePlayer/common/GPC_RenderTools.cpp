@@ -123,8 +123,6 @@ void GPC_RenderTools::ProcessLighting(RAS_IRasterizer *rasty, bool uselights, co
 		DisableOpenGLLights();
 }
 
-#include "../../creator/goglcontext.h"
-
 void GPC_RenderTools::EnableOpenGLLights(RAS_IRasterizer *rasty)
 {
 	if (m_lastlighting == true)

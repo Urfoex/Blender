@@ -214,7 +214,7 @@ endif()
 		list(SORT REM_MSG)
 		message(STATUS "Player Skipping: (${REM_MSG})")
 	endif()
-	target_link_libraries(blenderplayer ${BLENDER_SORTED_LIBS} ${GLEWMX_LIBRARIES})
+	target_link_libraries(blenderplayer ${BLENDER_SORTED_LIBS})
 
 	unset(SEARCHLIB)
 	unset(SORTLIB)

@@ -38,7 +38,6 @@ blender_include_dirs(
 	../blender/gpu
 	../blender/windowmanager
 )
-blender_include_dirs(${Qt5Gui_INCLUDE_DIRS})
 
 if(WIN32)
 	blender_include_dirs(../../intern/utfconv)
@@ -68,8 +67,7 @@ endif()
 
 if(WITH_GAMEENGINE)
 	blender_include_dirs(../gameengine/BlenderRoutines)
-	blender_include_dirs(${Qt5Gui_INCLUDE_DIRS})
-	
+
 	add_definitions(-DWITH_GAMEENGINE)
 endif()
 
@@ -778,10 +776,7 @@ unset(BLENDER_TEXT_FILES)
 # -----------------------------------------------------------------------------
 # Setup link libs
 
-qt5_use_modules(blender Gui OpenGL)
-
 add_dependencies(blender makesdna)
-
 
 get_property(BLENDER_LINK_LIBS GLOBAL PROPERTY BLENDER_LINK_LIBS)
 
