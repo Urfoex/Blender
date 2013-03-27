@@ -1880,6 +1880,9 @@ if(WITH_SYSTEM_GLEW)
 		GLEWMX_INCLUDE_DIRS
 	)
 	add_definitions(-DGLEW_MX)
+
+	find_package( Qt5OpenGL REQUIRED )
+	
 	
 else()
 	# set(GLEW_LIBRARY "")  # unused

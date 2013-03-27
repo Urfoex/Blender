@@ -207,12 +207,40 @@ static int BL_KetsjiPyNextFrame(void *state0)
 		state->draw_letterbox);
 }
 
+#undef debug
+#include <QGuiApplication>
+#include <QtConcurrent>
+
+#include <cassert>
+#include <memory>
+
+#include "qgamewindow.h"
 
 #define glewGetContext() G_OpenGL_Context
+
 GLEWContext* G_OpenGL_Context;
 
+std::shared_ptr<QGameWindow > qwindow;
+std::shared_ptr<QGuiApplication> qguiapp;
+
+int qgameapp(){
+	int argc = 0;
+	qguiapp = std::make_shared<QGuiApplication>(argc,nullptr);
+	qwindow = std::make_shared<QGameWindow >();
+	qwindow->show();
+	return qguiapp->exec();
+}
+
 extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *cam_frame, int always_use_expand_framing)
-{	
+{
+	GLEWContext* a = glewGetContext();
+	// TODO :: THIS IS WHERE IT ALL STARTS
+	auto gameapp = QtConcurrent::run(qgameapp);
+
+	GLEWContext* b = glewGetContext();
+
+	assert(a == b);
+	
 	/* context values */
 	struct wmWindow *win= CTX_wm_window(C);
 	struct Scene *startscene= CTX_data_scene(C);
@@ -684,4 +712,13 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 	// Release Python's GIL
 	PyGILState_Release(gilstate);
 #endif
+
+	if(gameapp.isRunning()){
+		qwindow->close();
+		qwindow = nullptr;
+		qguiapp->quit();
+		qguiapp = nullptr;
+// 		gameapp.cancel();
+	}
+	gameapp.waitForFinished();
 }
