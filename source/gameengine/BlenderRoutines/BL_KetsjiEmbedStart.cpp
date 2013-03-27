@@ -58,7 +58,6 @@
 
 #include "RAS_GLExtensionManager.h"
 #include "RAS_OpenGLRasterizer.h"
-#include "RAS_ListRasterizer.h"
 
 #include "NG_LoopBackNetworkDeviceInterface.h"
 
@@ -265,7 +264,6 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		bool profile = (SYS_GetCommandLineInt(syshandle, "show_profile", 0) != 0);
 		bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", 0) != 0);
 		bool animation_record = (SYS_GetCommandLineInt(syshandle, "animation_record", 0) != 0);
-		bool displaylists = (SYS_GetCommandLineInt(syshandle, "displaylists", 0) != 0);
 #ifdef WITH_PYTHON
 		bool nodepwarnings = (SYS_GetCommandLineInt(syshandle, "ignore_deprecation_warnings", 0) != 0);
 #endif
@@ -284,14 +282,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		else
 			canvas->SetMouseState(RAS_ICanvas::MOUSE_INVISIBLE);
 		RAS_IRenderTools* rendertools = new KX_BlenderRenderTools();
-		RAS_IRasterizer* rasterizer = NULL;
-		
-		//Don't use displaylists with VBOs
-		//If auto starts using VBOs, make sure to check for that here
-		if (displaylists && startscene->gm.raster_storage != RAS_STORE_VBO)
-			rasterizer = new RAS_ListRasterizer(canvas, true, startscene->gm.raster_storage);
-		else
-			rasterizer = new RAS_OpenGLRasterizer(canvas, startscene->gm.raster_storage);
+		RAS_IRasterizer* rasterizer = new RAS_OpenGLRasterizer(canvas, startscene->gm.raster_storage);
 		
 		// create the inputdevices
 		KX_BlenderKeyboardDevice* keyboarddevice = new KX_BlenderKeyboardDevice();

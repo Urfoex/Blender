@@ -76,7 +76,6 @@ extern "C"
 #include "SCA_IActuator.h"
 #include "RAS_MeshObject.h"
 #include "RAS_OpenGLRasterizer.h"
-#include "RAS_ListRasterizer.h"
 #include "RAS_GLExtensionManager.h"
 #include "KX_PythonInit.h"
 #include "KX_PyConstraintBinding.h"
@@ -560,7 +559,6 @@ bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 
 		bool fixed_framerate= (SYS_GetCommandLineInt(syshandle, "fixedtime", fixedFr) != 0);
 		bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", 0) != 0);
-		bool useLists = (SYS_GetCommandLineInt(syshandle, "displaylists", gm->flag & GAME_DISPLAY_LISTS) != 0);
 		bool nodepwarnings = (SYS_GetCommandLineInt(syshandle, "ignore_deprecation_warnings", 1) != 0);
 		bool restrictAnimFPS = gm->flag & GAME_RESTRICT_ANIM_UPDATES;
 
@@ -585,12 +583,8 @@ bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 		if (!m_rendertools)
 			goto initFailed;
 		
-		//Don't use displaylists with VBOs
-		//If auto starts using VBOs, make sure to check for that here
-		if (useLists && gm->raster_storage != RAS_STORE_VBO)
-			m_rasterizer = new RAS_ListRasterizer(m_canvas, false, gm->raster_storage);
-		else
-			m_rasterizer = new RAS_OpenGLRasterizer(m_canvas, gm->raster_storage);
+
+		m_rasterizer = new RAS_OpenGLRasterizer(m_canvas, gm->raster_storage);
 
 		/* Stereo parameters - Eye Separation from the UI - stereomode from the command-line/UI */
 		m_rasterizer->SetStereoMode((RAS_IRasterizer::StereoMode) stereoMode);
