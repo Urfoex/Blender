@@ -15,13 +15,15 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Joseph Eagar.
+ * Contributor(s): Joseph Eagar, Campbell Barton.
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
 /** \file blender/bmesh/operators/bmo_create.c
- *  \ingroup bmesh
+ *  \ingroup bmesh 
+ *
+ * Create faces or edges (Fkey by default).
  */
 
 #include "MEM_guardedalloc.h"
@@ -109,7 +111,7 @@ void bmo_contextual_create_exec(BMesh *bm, BMOperator *op)
 				else                 ok = false;  /* only ever want one of these */
 			}
 			else if (tot_edges == 1) {
-				if (v_a == NULL)       v_a = v;
+				if      (v_a == NULL)  v_a = v;
 				else if (v_b == NULL)  v_b = v;
 				else                   ok = false;  /* only ever want 2 of these */
 			}

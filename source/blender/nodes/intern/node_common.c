@@ -84,16 +84,20 @@ bNodeSocket *node_group_find_output_socket(bNode *groupnode, const char *identif
 /* groups display their internal tree name as label */
 const char *node_group_label(bNode *node)
 {
-	return (node->id)? node->id->name + 2: IFACE_("Missing Datablock");
+	return (node->id) ? node->id->name + 2 : IFACE_("Missing Datablock");
 }
 
 int node_group_poll_instance(bNode *node, bNodeTree *nodetree)
 {
-	bNodeTree *grouptree = (bNodeTree*)node->id;
-	if (grouptree)
-		return nodeGroupPoll(nodetree, grouptree);
+	if (node->typeinfo->poll(node->typeinfo, nodetree)) {
+		bNodeTree *grouptree = (bNodeTree*)node->id;
+		if (grouptree)
+			return nodeGroupPoll(nodetree, grouptree);
+		else
+			return TRUE;	/* without a linked node tree, group node is always ok */
+	}
 	else
-		return 1;
+		return FALSE;
 }
 
 int nodeGroupPoll(bNodeTree *nodetree, bNodeTree *grouptree)

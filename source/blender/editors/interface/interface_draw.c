@@ -1284,25 +1284,24 @@ void ui_draw_but_NORMAL(uiBut *but, uiWidgetColors *wcol, rcti *rect)
 		size = BLI_rcti_size_y(rect) / 200.f;
 	
 	glScalef(size, size, size);
-	
+
 	if (displist == 0) {
-		GLUquadricObj   *qobj;
-		
+		GLUquadricObj *qobj;
+
 		displist = glGenLists(1);
-		glNewList(displist, GL_COMPILE_AND_EXECUTE);
+		glNewList(displist, GL_COMPILE);
 		
 		qobj = gluNewQuadric();
-		gluQuadricDrawStyle(qobj, GLU_FILL); 
+		gluQuadricDrawStyle(qobj, GLU_FILL);
 		glShadeModel(GL_SMOOTH);
 		gluSphere(qobj, 100.0, 32, 24);
 		glShadeModel(GL_FLAT);
-		gluDeleteQuadric(qobj);  
+		gluDeleteQuadric(qobj);
 		
 		glEndList();
 	}
-	else {
-		glCallList(displist);
-	}
+
+	glCallList(displist);
 
 	/* restore */
 	glDisable(GL_LIGHTING);

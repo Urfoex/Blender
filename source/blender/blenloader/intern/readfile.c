@@ -2373,7 +2373,7 @@ static void lib_node_do_versions_group_indices(bNode *gnode)
 		int old_index = sock->to_index;
 		
 		for (link = ngroup->links.first; link; link = link->next) {
-			if (link->tonode->type == NODE_GROUP_OUTPUT && link->fromsock->own_index == old_index) {
+			if (link->tonode == NULL && link->fromsock->own_index == old_index) {
 				strcpy(sock->identifier, link->fromsock->identifier);
 				/* deprecated */
 				sock->own_index = link->fromsock->own_index;
@@ -2386,7 +2386,7 @@ static void lib_node_do_versions_group_indices(bNode *gnode)
 		int old_index = sock->to_index;
 		
 		for (link = ngroup->links.first; link; link = link->next) {
-			if (link->fromnode->type == NODE_GROUP_INPUT && link->tosock->own_index == old_index) {
+			if (link->fromnode == NULL && link->tosock->own_index == old_index) {
 				strcpy(sock->identifier, link->tosock->identifier);
 				/* deprecated */
 				sock->own_index = link->tosock->own_index;
@@ -6350,7 +6350,6 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 				
 				sclip->scopes.track_search = NULL;
 				sclip->scopes.track_preview = NULL;
-				sclip->draw_context = NULL;
 				sclip->scopes.ok = 0;
 			}
 		}
@@ -6536,7 +6535,7 @@ static void lib_link_group(FileData *fd, Main *main)
 				}
 			}
 			if (add_us) group->id.us++;
-			rem_from_group(group, NULL, NULL, NULL);	/* removes NULL entries */
+			BKE_group_object_unlink(group, NULL, NULL, NULL);	/* removes NULL entries */
 		}
 	}
 }
@@ -7936,7 +7935,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						if (ba->axis==(float) 'x') ba->axis=OB_POSX;
 						else if (ba->axis==(float)'y') ba->axis=OB_POSY;
 						/* don't do an if/else to avoid imediate subversion bump*/
-//					ba->axis=((ba->axis == (float) 'x')?OB_POSX_X:OB_POSY);
+//						ba->axis=((ba->axis == (float)'x') ? OB_POSX_X : OB_POSY);
 					}
 				}
 			}
@@ -9078,7 +9077,18 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	}
 
 	if (main->versionfile < 267) {
-		
+		//if(!DNA_struct_elem_find(fd->filesdna, "Brush", "int", "stencil_pos")) {
+		Brush *brush;
+
+		for (brush = main->brush.first; brush; brush = brush->id.next) {
+			if (brush->stencil_dimension[0] == 0) {
+				brush->stencil_dimension[0] = 256;
+				brush->stencil_dimension[1] = 256;
+				brush->stencil_pos[0] = 256;
+				brush->stencil_pos[1] = 256;
+			}
+		}
+
 		/* TIP: to initialize new variables added, use the new function
 		   DNA_struct_elem_find(fd->filesdna, "structname", "typename", "varname")
 		   example: 
