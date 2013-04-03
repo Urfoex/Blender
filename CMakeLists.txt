@@ -2122,13 +2122,6 @@ add_subdirectory(extern)
 
 
 #-----------------------------------------------------------------------------
-# Blender Application
-if(WITH_BLENDER)
-	add_subdirectory(source/creator)
-endif()
-
-
-#-----------------------------------------------------------------------------
 # Blender Player
 if(WITH_PLAYER)
 	add_subdirectory(source/blenderplayer)
