@@ -546,7 +546,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				else
 #endif  /* WITH_PYTHON */
 				{
-					while (!exitrequested)
+					while (!exitrequested) // GAME LOOP
 					{
 						exitrequested = BL_KetsjiNextFrame(ketsjiengine, C, win, scene, ar, keyboarddevice, mousedevice, draw_letterbox);
 					}

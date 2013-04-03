@@ -30,8 +30,8 @@
  */
 
  
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
  
 #include "RAS_OpenGLRasterizer.h"
 

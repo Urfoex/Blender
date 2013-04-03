@@ -41,9 +41,19 @@ BL_BlenderShader::~BL_BlenderShader()
 		GPU_material_unbind(mGPUMat);
 }
 
-void BL_BlenderShader::ReloadMaterial()
+void BL_BlenderShader::ReloadMaterial() // get GLSL materials from Blender
 {
+	// gpu_material.c
+	// gpu_codegen.h
+	// gpu_extensions.c
 	mGPUMat = (mMat) ? GPU_material_from_blender(mBlenderScene, mMat) : NULL;
+
+// 	char** code = GetVFSource(mGPUMat);
+// 
+// 	std::cout << "[VERTEX-SHADER]\n";
+// 	std::cout << code[0] << std::endl;
+// 	std::cout << "[FRAGMENT-SHADER]\n";
+// 	std::cout << code[1] << std::endl;
 }
 
 void BL_BlenderShader::SetProg(bool enable, double time)

@@ -44,6 +44,7 @@ namespace bgl
 			firsttime = false;
 
 			if (debug) {
+				// TODO  glewIsSupported("EXT") == GL_TRUE
 				if (GLEW_ATI_pn_triangles)
 					std::cout << "Enabled GL_ATI_pn_triangles" << std::endl;
 				if (GLEW_ARB_texture_env_combine)

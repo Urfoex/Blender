@@ -2126,3 +2126,22 @@ void GPU_free_shader_export(GPUShaderExport *shader)
 	MEM_freeN(shader);
 }
 
+// GLchar** GetVFSource(GPUMaterial* mat){
+// 	GLhandleARB shader = mat->pass->shader->object;
+// 	GLhandleARB vert = mat->pass->shader->vertex;
+// 	GLhandleARB frag = mat->pass->shader->fragment;
+// 	GLint vlen, flen;
+// 	GLchar** code;
+// 	GLchar* vs, fs;
+// 	
+// 	glGetShader( vert, GL_SHADER_SOURCE_LENGTH, &vlen);
+// 	glGetShader( frag, GL_SHADER_SOURCE_LENGTH, &flen);
+// 	
+// 	vs = (char*)calloc(vlen, sizeof(char));
+// 	fs = (char*)calloc(flen, sizeof(char));
+// 	glGetShaderSource(vert, vlen, NULL, vs);
+// 	glGetShaderSource(frag, flen, NULL, fs);
+// 	code[0] = vs;
+// 	code[1] = fs;
+// 	return code;
+// }
