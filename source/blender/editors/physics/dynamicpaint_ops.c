@@ -66,12 +66,14 @@ static int surface_slot_add_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* Make sure we're dealing with a canvas */
 	pmd = (DynamicPaintModifierData *)modifiers_findByType(cObject, eModifierType_DynamicPaint);
-	if (!pmd || !pmd->canvas) return OPERATOR_CANCELLED;
+	if (!pmd || !pmd->canvas)
+		return OPERATOR_CANCELLED;
 
 	canvas = pmd->canvas;
 	surface = dynamicPaint_createNewSurface(canvas, CTX_data_scene(C));
 
-	if (!surface) return OPERATOR_CANCELLED;
+	if (!surface)
+		return OPERATOR_CANCELLED;
 
 	/* set preview for this surface only and set active */
 	canvas->active_sur = 0;
@@ -202,7 +204,6 @@ void DPAINT_OT_type_toggle(wmOperatorType *ot)
 static int output_toggle_exec(bContext *C, wmOperator *op)
 {
 	Object *ob = ED_object_context(C);
-	Scene *scene = CTX_data_scene(C);
 	DynamicPaintSurface *surface;
 	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)modifiers_findByType(ob, eModifierType_DynamicPaint);
 	int output = RNA_enum_get(op->ptr, "output");  /* currently only 1/0 */
@@ -223,9 +224,9 @@ static int output_toggle_exec(bContext *C, wmOperator *op)
 		/* Vertex Color Layer */
 		if (surface->type == MOD_DPAINT_SURFACE_T_PAINT) {
 			if (!exists)
-				ED_mesh_color_add(C, scene, ob, ob->data, name, 1);
+				ED_mesh_color_add(ob->data, name, true);
 			else 
-				ED_mesh_color_remove_named(C, ob, ob->data, name);
+				ED_mesh_color_remove_named(ob->data, name);
 		}
 		/* Vertex Weight Layer */
 		else if (surface->type == MOD_DPAINT_SURFACE_T_WEIGHT) {
@@ -393,7 +394,7 @@ static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 		/* Format time string */
 		char time_str[30];
 		double time = PIL_check_seconds_timer() - timer;
-		BLI_timestr(time, time_str);
+		BLI_timestr(time, time_str, sizeof(time_str));
 
 		/* Show bake info */
 		BKE_reportf(op->reports, RPT_INFO, "Bake complete! (%s)", time_str);

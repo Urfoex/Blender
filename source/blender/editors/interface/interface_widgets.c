@@ -1147,6 +1147,8 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 	
 	if (but->editstr || (but->flag & UI_TEXT_LEFT))
 		fstyle->align = UI_STYLE_TEXT_LEFT;
+	else if (but->flag & UI_TEXT_RIGHT)
+		fstyle->align = UI_STYLE_TEXT_RIGHT;
 	else
 		fstyle->align = UI_STYLE_TEXT_CENTER;
 	
@@ -1333,16 +1335,22 @@ static void widget_draw_text_icon(uiFontStyle *fstyle, uiWidgetColors *wcol, uiB
 			if (but->editstr || (but->flag & UI_TEXT_LEFT)) {
 				rect->xmin += (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
 			}
+			else if ((but->flag & UI_TEXT_RIGHT)) {
+				rect->xmax -= (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
+			}
 		}
 		else if ((but->flag & UI_TEXT_LEFT)) {
 			rect->xmin += (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
+		}
+		else if ((but->flag & UI_TEXT_RIGHT)) {
+			rect->xmax -= (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
 		}
 		
 		/* unlink icon for this button type */
 		if (but->type == SEARCH_MENU_UNLINK && but->drawstr[0]) {
 			rcti temp = *rect;
-			
-			temp.xmin = temp.xmax - BLI_rcti_size_y(rect);
+
+			temp.xmin = temp.xmax - (BLI_rcti_size_y(rect) * 1.08f);
 			widget_draw_icon(but, ICON_X, alpha, &temp);
 		}
 
@@ -3216,7 +3224,6 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 				break;
 				
 			case NUMSLI:
-			case HSVSLI:
 				wt = widget_type(UI_WTYPE_SLIDER);
 				break;
 				
@@ -3520,7 +3527,6 @@ void ui_draw_preview_item(uiFontStyle *fstyle, rcti *rect, const char *name, int
 	rcti trect = *rect, bg_rect;
 	float font_dims[2] = {0.0f, 0.0f};
 	uiWidgetType *wt = widget_type(UI_WTYPE_MENU_ITEM);
-	unsigned char bg_col[3];
 	
 	wt->state(wt, state);
 	wt->draw(&wt->wcol, rect, 0, 0);
@@ -3546,16 +3552,12 @@ void ui_draw_preview_item(uiFontStyle *fstyle, rcti *rect, const char *name, int
 	if (bg_rect.xmax > rect->xmax - PREVIEW_PAD)
 		bg_rect.xmax = rect->xmax - PREVIEW_PAD;
 
-	UI_GetThemeColor3ubv(TH_BUTBACK, bg_col);
-	glColor4ubv((unsigned char *)wt->wcol.item);
+	glColor4ubv((unsigned char *)wt->wcol_theme->inner_sel);
 	glEnable(GL_BLEND);
 	glRecti(bg_rect.xmin, bg_rect.ymin, bg_rect.xmax, bg_rect.ymax);
 	glDisable(GL_BLEND);
 	
-	if (state == UI_ACTIVE)
-		glColor4ubv((unsigned char *)wt->wcol.text);
-	else
-		glColor4ubv((unsigned char *)wt->wcol.text_sel);
+	glColor3ubv((unsigned char *)wt->wcol.text);
 
 	uiStyleFontDraw(fstyle, &trect, name);
 }

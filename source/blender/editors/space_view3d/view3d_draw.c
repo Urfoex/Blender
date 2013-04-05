@@ -1433,6 +1433,13 @@ void view3d_opengl_read_pixels(ARegion *ar, int x, int y, int w, int h, int form
 	}
 }
 
+/* XXX depth reading exception, for code not using gpu offscreen */
+static void view3d_opengl_read_Z_pixels(ARegion *ar, int x, int y, int w, int h, int format, int type, void *data)
+{
+
+	glReadPixels(ar->winrct.xmin + x, ar->winrct.ymin + y, w, h, format, type, data);
+}
+
 void view3d_validate_backbuf(ViewContext *vc)
 {
 	if (vc->v3d->flag & V3D_INVALID_BACKBUF)
@@ -1824,7 +1831,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			 * glaDrawPixelsSafe in some cases, which will end up in misssing
 			 * alpha transparency for the background image (sergey)
 			 */
-			glaDrawPixelsTex(x1, y1, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_NEAREST, ibuf->rect);
+			glaDrawPixelsTex(x1, y1, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, ibuf->rect);
 
 			glPixelZoom(1.0, 1.0);
 			glPixelTransferf(GL_ALPHA_SCALE, 1.0f);
@@ -2104,6 +2111,7 @@ static void draw_dupli_objects(Scene *scene, ARegion *ar, View3D *v3d, Base *bas
 	draw_dupli_objects_color(scene, ar, v3d, base, color);
 }
 
+/* XXX warning, not using gpu offscreen here */
 void view3d_update_depths_rect(ARegion *ar, ViewDepths *d, rcti *rect)
 {
 	int x, y, w, h;
@@ -2153,7 +2161,8 @@ void view3d_update_depths_rect(ARegion *ar, ViewDepths *d, rcti *rect)
 	}
 
 	if (d->damaged) {
-		view3d_opengl_read_pixels(ar, d->x, d->y, d->w, d->h, GL_DEPTH_COMPONENT, GL_FLOAT, d->depths);
+		/* XXX using special function here, it doesn't use the gpu offscreen system */
+		view3d_opengl_read_Z_pixels(ar, d->x, d->y, d->w, d->h, GL_DEPTH_COMPONENT, GL_FLOAT, d->depths);
 		glGetDoublev(GL_DEPTH_RANGE, d->depth_range);
 		d->damaged = false;
 	}
@@ -3244,7 +3253,6 @@ static void view3d_main_area_draw_objects(const bContext *C, ARegion *ar, const 
 
 	/* enables anti-aliasing for 3D view drawing */
 	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
-		// if (!(U.gameflags & USER_DISABLE_AA))
 		glEnable(GL_MULTISAMPLE_ARB);
 	}
 
@@ -3362,7 +3370,6 @@ static void view3d_main_area_draw_objects(const bContext *C, ARegion *ar, const 
 
 	/* Disable back anti-aliasing */
 	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
-		// if (!(U.gameflags & USER_DISABLE_AA))
 		glDisable(GL_MULTISAMPLE_ARB);
 	}
 

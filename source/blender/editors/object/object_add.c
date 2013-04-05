@@ -372,7 +372,7 @@ Object *ED_object_add_type(bContext *C, int type, const float loc[3], const floa
 
 	/* for as long scene has editmode... */
 	if (CTX_data_edit_object(C)) 
-		ED_object_exit_editmode(C, EM_FREEDATA | EM_FREEUNDO | EM_WAITCURSOR | EM_DO_UNDO);  /* freedata, and undo */
+		ED_object_editmode_exit(C, EM_FREEDATA | EM_FREEUNDO | EM_WAITCURSOR | EM_DO_UNDO);  /* freedata, and undo */
 
 	/* deselects all, sets scene->basact */
 	ob = BKE_object_add(scene, type);
@@ -390,7 +390,7 @@ Object *ED_object_add_type(bContext *C, int type, const float loc[3], const floa
 	}
 
 	if (enter_editmode)
-		ED_object_enter_editmode(C, EM_IGNORE_LAYER);
+		ED_object_editmode_enter(C, EM_IGNORE_LAYER);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
 
@@ -452,20 +452,20 @@ static int effector_add_exec(bContext *C, wmOperator *op)
 		if (!ob)
 			return OPERATOR_CANCELLED;
 
-		rename_id(&ob->id, DATA_("CurveGuide"));
+		rename_id(&ob->id, CTX_DATA_(BLF_I18NCONTEXT_ID_OBJECT, "CurveGuide"));
 		((Curve *)ob->data)->flag |= CU_PATH | CU_3D;
-		ED_object_enter_editmode(C, 0);
+		ED_object_editmode_enter(C, 0);
 		ED_object_new_primitive_matrix(C, ob, loc, rot, mat, FALSE);
 		BLI_addtail(object_editcurve_get(ob), add_nurbs_primitive(C, ob, mat, CU_NURBS | CU_PRIM_PATH, 1));
 		if (!enter_editmode)
-			ED_object_exit_editmode(C, EM_FREEDATA);
+			ED_object_editmode_exit(C, EM_FREEDATA);
 	}
 	else {
 		ob = ED_object_add_type(C, OB_EMPTY, loc, rot, FALSE, layer);
 		if (!ob)
 			return OPERATOR_CANCELLED;
 
-		rename_id(&ob->id, DATA_("Field"));
+		rename_id(&ob->id, CTX_DATA_(BLF_I18NCONTEXT_ID_OBJECT, "Field"));
 		if (ELEM(type, PFIELD_WIND, PFIELD_VORTEX))
 			ob->empty_drawtype = OB_SINGLE_ARROW;
 	}
@@ -578,7 +578,7 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
 
 	/* userdef */
 	if (newob && !enter_editmode) {
-		ED_object_exit_editmode(C, EM_FREEDATA);
+		ED_object_editmode_exit(C, EM_FREEDATA);
 	}
 
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
@@ -661,7 +661,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 
 	if ((obedit == NULL) || (obedit->type != OB_ARMATURE)) {
 		obedit = ED_object_add_type(C, OB_ARMATURE, loc, rot, TRUE, layer);
-		ED_object_enter_editmode(C, 0);
+		ED_object_editmode_enter(C, 0);
 		newob = 1;
 	}
 	else {
@@ -678,7 +678,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 
 	/* userdef */
 	if (newob && !enter_editmode)
-		ED_object_exit_editmode(C, EM_FREEDATA);
+		ED_object_editmode_exit(C, EM_FREEDATA);
 
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
 
@@ -822,13 +822,13 @@ void OBJECT_OT_drop_named_image(wmOperatorType *ot)
 static const char *get_lamp_defname(int type)
 {
 	switch (type) {
-		case LA_LOCAL: return DATA_("Point");
-		case LA_SUN: return DATA_("Sun");
-		case LA_SPOT: return DATA_("Spot");
-		case LA_HEMI: return DATA_("Hemi");
-		case LA_AREA: return DATA_("Area");
+		case LA_LOCAL: return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Point");
+		case LA_SUN: return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Sun");
+		case LA_SPOT: return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Spot");
+		case LA_HEMI: return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Hemi");
+		case LA_AREA: return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Area");
 		default:
-			return DATA_("Lamp");
+			return CTX_DATA_(BLF_I18NCONTEXT_ID_LAMP, "Lamp");
 	}
 }
 
@@ -1707,7 +1707,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 		DAG_relations_tag_update(bmain);
 	}
 
-// XXX	ED_object_enter_editmode(C, 0);
+// XXX	ED_object_editmode_enter(C, 0);
 // XXX	exit_editmode(C, EM_FREEDATA|EM_WAITCURSOR); /* freedata, but no undo */
 
 	if (basact) {
@@ -1786,8 +1786,8 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 		if ((basen->flag & OB_FROMGROUP) || ob->rigidbody_object || ob->rigidbody_constraint) {
 			Group *group;
 			for (group = bmain->group.first; group; group = group->id.next) {
-				if (object_in_group(ob, group))
-					add_to_group(group, obn, scene, basen);
+				if (BKE_group_object_exists(group, ob))
+					BKE_group_object_add(group, obn, scene, basen);
 			}
 		}
 

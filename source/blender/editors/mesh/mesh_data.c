@@ -61,7 +61,7 @@
 #include "ED_uvedit.h"
 #include "ED_view3d.h"
 
-#include "mesh_intern.h"
+#include "mesh_intern.h"  /* own include */
 
 
 static CustomData *mesh_customdata_get_type(Mesh *me, const char htype, int *r_tot)
@@ -123,9 +123,8 @@ static CustomData *mesh_customdata_get_type(Mesh *me, const char htype, int *r_t
 }
 
 #define GET_CD_DATA(me, data) (me->edit_btmesh ? &me->edit_btmesh->bm->data : &me->data)
-static void delete_customdata_layer(bContext *C, Object *ob, CustomDataLayer *layer)
+static void delete_customdata_layer(Mesh *me, CustomDataLayer *layer)
 {
-	Mesh *me = ob->data;
 	CustomData *data;
 	void *actlayerdata, *rndlayerdata, *clonelayerdata, *stencillayerdata, *layerdata = layer->data;
 	int type = layer->type;
@@ -161,9 +160,6 @@ static void delete_customdata_layer(bContext *C, Object *ob, CustomDataLayer *la
 		CustomData_free_layer_active(data, type, tot);
 		BKE_mesh_update_customdata_pointers(me, true);
 	}
-
-	if (!CustomData_has_layer(data, type) && (type == CD_MLOOPCOL && (ob->mode & OB_MODE_VERTEX_PAINT)))
-		ED_object_toggle_modes(C, OB_MODE_VERTEX_PAINT);
 
 	/* reconstruct active layer */
 	if (actlayerdata != layerdata) {
@@ -344,7 +340,7 @@ int ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me)
 }
 
 /* note: keep in sync with ED_mesh_color_add */
-int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_set)
+int ED_mesh_uv_texture_add(Mesh *me, const char *name, const bool active_set)
 {
 	BMEditMesh *em;
 	int layernum_dst;
@@ -415,37 +411,68 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 	}
 
 	DAG_id_tag_update(&me->id, 0);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
+	WM_main_add_notifier(NC_GEOM | ND_DATA, me);
 
 	return layernum_dst;
 }
 
-int ED_mesh_uv_texture_remove(bContext *C, Object *ob, Mesh *me)
+bool ED_mesh_uv_texture_remove_index(Mesh *me, const int n)
 {
 	CustomData *pdata = GET_CD_DATA(me, pdata), *ldata = GET_CD_DATA(me, ldata);
 	CustomDataLayer *cdlp, *cdlu;
 	int index;
 
-	index = CustomData_get_active_layer_index(pdata, CD_MTEXPOLY);
+	index = CustomData_get_layer_index_n(pdata, CD_MTEXPOLY, n);
 	cdlp = (index == -1) ? NULL : &pdata->layers[index];
 
-	index = CustomData_get_active_layer_index(ldata, CD_MLOOPUV);
+	index = CustomData_get_layer_index_n(ldata, CD_MLOOPUV, n);
 	cdlu = (index == -1) ? NULL : &ldata->layers[index];
-	
+
 	if (!cdlp || !cdlu)
-		return 0;
+		return false;
 
-	delete_customdata_layer(C, ob, cdlp);
-	delete_customdata_layer(C, ob, cdlu);
-	
+	delete_customdata_layer(me, cdlp);
+	delete_customdata_layer(me, cdlu);
+
 	DAG_id_tag_update(&me->id, 0);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
+	WM_main_add_notifier(NC_GEOM | ND_DATA, me);
 
-	return 1;
+	return true;
+}
+bool ED_mesh_uv_texture_remove_active(Mesh *me)
+{
+	/* texpoly/uv are assumed to be in sync */
+	CustomData *pdata = GET_CD_DATA(me, pdata);
+	const int n = CustomData_get_active_layer(pdata, CD_MTEXPOLY);
+
+	/* double check active layers align! */
+#ifdef DEBUG
+	CustomData *ldata = GET_CD_DATA(me, ldata);
+	BLI_assert(CustomData_get_active_layer(ldata, CD_MLOOPUV) == n);
+#endif
+
+	if (n != -1) {
+		return ED_mesh_uv_texture_remove_index(me, n);
+	}
+	else {
+		return false;
+	}
+}
+bool ED_mesh_uv_texture_remove_named(Mesh *me, const char *name)
+{
+	/* texpoly/uv are assumed to be in sync */
+	CustomData *pdata = GET_CD_DATA(me, pdata);
+	const int n = CustomData_get_named_layer(pdata, CD_MTEXPOLY, name);
+	if (n != -1) {
+		return ED_mesh_uv_texture_remove_index(me, n);
+	}
+	else {
+		return false;
+	}
 }
 
 /* note: keep in sync with ED_mesh_uv_texture_add */
-int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mesh *me, const char *name, int active_set)
+int ED_mesh_color_add(Mesh *me, const char *name, const bool active_set)
 {
 	BMEditMesh *em;
 	int layernum;
@@ -493,47 +520,50 @@ int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mes
 	}
 
 	DAG_id_tag_update(&me->id, 0);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
+	WM_main_add_notifier(NC_GEOM | ND_DATA, me);
 
 	return layernum;
 }
 
-int ED_mesh_color_remove(bContext *C, Object *ob, Mesh *me)
+bool ED_mesh_color_remove_index(Mesh *me, const int n)
 {
 	CustomData *ldata = GET_CD_DATA(me, ldata);
 	CustomDataLayer *cdl;
 	int index;
 
-	index = CustomData_get_active_layer_index(ldata, CD_MLOOPCOL);
+	index = CustomData_get_layer_index_n(ldata, CD_MLOOPCOL, n);
 	cdl = (index == -1) ? NULL : &ldata->layers[index];
 
 	if (!cdl)
-		return 0;
+		return false;
 
-	delete_customdata_layer(C, ob, cdl);
+	delete_customdata_layer(me, cdl);
 	DAG_id_tag_update(&me->id, 0);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
+	WM_main_add_notifier(NC_GEOM | ND_DATA, me);
 
-	return 1;
+	return true;
 }
-
-int ED_mesh_color_remove_named(bContext *C, Object *ob, Mesh *me, const char *name)
+bool ED_mesh_color_remove_active(Mesh *me)
 {
 	CustomData *ldata = GET_CD_DATA(me, ldata);
-	CustomDataLayer *cdl;
-	int index;
-
-	index = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, name);
-	cdl = (index == -1) ? NULL : &ldata->layers[index];
-
-	if (!cdl)
-		return 0;
-
-	delete_customdata_layer(C, ob, cdl);
-	DAG_id_tag_update(&me->id, 0);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
-
-	return 1;
+	const int n = CustomData_get_active_layer(ldata, CD_MLOOPCOL);
+	if (n != -1) {
+		return ED_mesh_color_remove_index(me, n);
+	}
+	else {
+		return false;
+	}
+}
+bool ED_mesh_color_remove_named(Mesh *me, const char *name)
+{
+	CustomData *ldata = GET_CD_DATA(me, ldata);
+	const int n = CustomData_get_named_layer(ldata, CD_MLOOPCOL, name);
+	if (n != -1) {
+		return ED_mesh_color_remove_index(me, n);
+	}
+	else {
+		return false;
+	}
 }
 
 /*********************** UV texture operators ************************/
@@ -550,7 +580,7 @@ static int mesh_uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob = ED_object_context(C);
 	Mesh *me = ob->data;
 
-	if (ED_mesh_uv_texture_add(C, me, NULL, true) == -1)
+	if (ED_mesh_uv_texture_add(me, NULL, true) == -1)
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;
@@ -670,7 +700,7 @@ static int mesh_uv_texture_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob = ED_object_context(C);
 	Mesh *me = ob->data;
 
-	if (!ED_mesh_uv_texture_remove(C, ob, me))
+	if (!ED_mesh_uv_texture_remove_active(me))
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;
@@ -695,11 +725,10 @@ void MESH_OT_uv_texture_remove(wmOperatorType *ot)
 
 static int mesh_vertex_color_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Scene *scene = CTX_data_scene(C);
 	Object *ob = ED_object_context(C);
 	Mesh *me = ob->data;
 
-	if (ED_mesh_color_add(C, scene, ob, me, NULL, true) == -1)
+	if (ED_mesh_color_add(me, NULL, true) == -1)
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;
@@ -725,7 +754,7 @@ static int mesh_vertex_color_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob = ED_object_context(C);
 	Mesh *me = ob->data;
 
-	if (!ED_mesh_color_remove(C, ob, me))
+	if (!ED_mesh_color_remove_active(me))
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;

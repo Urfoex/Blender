@@ -251,16 +251,18 @@ void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int 
 void ED_mesh_transform(struct Mesh *me, float *mat);
 void ED_mesh_calc_normals(struct Mesh *me);
 void ED_mesh_calc_tessface(struct Mesh *mesh);
-void ED_mesh_material_link(struct Mesh *me, struct Material *ma);
 void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int calc_tessface);
 
-int ED_mesh_uv_texture_add(struct bContext *C, struct Mesh *me, const char *name, int active_set);
-int ED_mesh_uv_texture_remove(struct bContext *C, struct Object *ob, struct Mesh *me);
+int ED_mesh_uv_texture_add(struct Mesh *me, const char *name, const bool active_set);
+bool ED_mesh_uv_texture_remove_index(struct Mesh *me, const int n);
+bool ED_mesh_uv_texture_remove_active(struct Mesh *me);
+bool ED_mesh_uv_texture_remove_named(struct Mesh *me, const char *name);
 int ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me);
 int ED_mesh_uv_loop_reset_ex(struct Mesh *me, const int layernum);
-int ED_mesh_color_add(struct bContext *C, struct Scene *scene, struct Object *ob, struct Mesh *me, const char *name, int active_set);
-int ED_mesh_color_remove(struct bContext *C, struct Object *ob, struct Mesh *me);
-int ED_mesh_color_remove_named(struct bContext *C, struct Object *ob, struct Mesh *me, const char *name);
+int ED_mesh_color_add(struct Mesh *me, const char *name, const bool active_set);
+bool ED_mesh_color_remove_index(struct Mesh *me, const int n);
+bool ED_mesh_color_remove_active(struct Mesh *me);
+bool ED_mesh_color_remove_named(struct Mesh *me, const char *name);
 
 /* mesh backup */
 typedef struct BMBackup {
@@ -275,7 +277,7 @@ void EDBM_redo_state_restore(struct BMBackup, struct BMEditMesh *em, int recalct
 void EDBM_redo_state_free(struct BMBackup *, struct BMEditMesh *em, int recalctess);
 
 
-/* meshtools.c */
+/* *** meshtools.c *** */
 int         join_mesh_exec(struct bContext *C, struct wmOperator *op);
 int         join_mesh_shapes_exec(struct bContext *C, struct wmOperator *op);
 

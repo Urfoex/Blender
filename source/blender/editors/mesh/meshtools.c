@@ -60,7 +60,6 @@
 #include "BKE_tessmesh.h"
 #include "BKE_multires.h"
 
-
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_view3d.h"
@@ -566,8 +565,8 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	DAG_relations_tag_update(bmain);   // removed objects, need to rebuild dag
 
 #if 0
-	ED_object_enter_editmode(C, EM_WAITCURSOR);
-	ED_object_exit_editmode(C, EM_FREEDATA | EM_WAITCURSOR | EM_DO_UNDO);
+	ED_object_editmode_enter(C, EM_WAITCURSOR);
+	ED_object_editmode_exit(C, EM_FREEDATA | EM_WAITCURSOR | EM_DO_UNDO);
 #else
 	/* toggle editmode using lower level functions so this can be called from python */
 	EDBM_mesh_make(scene->toolsettings, scene, ob);

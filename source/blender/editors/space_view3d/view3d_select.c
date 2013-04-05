@@ -108,39 +108,6 @@ void view3d_set_viewcontext(bContext *C, ViewContext *vc)
 	vc->obedit = CTX_data_edit_object(C);
 }
 
-/**
- * Re-project \a fp so it stays on the same view-plane but is under \a mval (normally the cursor location).
- */
-bool view3d_get_view_aligned_coordinate(ARegion *ar, float fp[3], const int mval[2], const bool do_fallback)
-{
-	RegionView3D *rv3d = ar->regiondata;
-	float dvec[3];
-	int mval_cpy[2];
-	eV3DProjStatus ret;
-
-	ret = ED_view3d_project_int_global(ar, fp, mval_cpy, V3D_PROJ_TEST_NOP);
-
-	if (ret == V3D_PROJ_RET_OK) {
-		const float mval_f[2] = {(float)(mval_cpy[0] - mval[0]),
-		                         (float)(mval_cpy[1] - mval[1])};
-		const float zfac = ED_view3d_calc_zfac(rv3d, fp, NULL);
-		ED_view3d_win_to_delta(ar, mval_f, dvec, zfac);
-		sub_v3_v3(fp, dvec);
-
-		return true;
-	}
-	else {
-		/* fallback to the view center */
-		if (do_fallback) {
-			negate_v3_v3(fp, rv3d->ofs);
-			return view3d_get_view_aligned_coordinate(ar, fp, mval, false);
-		}
-		else {
-			return false;
-		}
-	}
-}
-
 /*
  * ob == NULL if you want global matrices
  * */
@@ -1031,8 +998,8 @@ static EnumPropertyItem *object_select_menu_enum_itemf(bContext *C, PointerRNA *
 
 static int object_select_menu_exec(bContext *C, wmOperator *op)
 {
-	int name_index = RNA_enum_get(op->ptr, "name");
-	short toggle = RNA_boolean_get(op->ptr, "toggle");
+	const int name_index = RNA_enum_get(op->ptr, "name");
+	const bool toggle = RNA_boolean_get(op->ptr, "toggle");
 	bool change = false;
 	const char *name = object_mouse_select_menu_data[name_index].idname;
 
@@ -2762,8 +2729,8 @@ static int view3d_circle_select_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *obact = CTX_data_active_object(C);
-	int radius = RNA_int_get(op->ptr, "radius");
-	int gesture_mode = RNA_int_get(op->ptr, "gesture_mode");
+	const int radius = RNA_int_get(op->ptr, "radius");
+	const int gesture_mode = RNA_int_get(op->ptr, "gesture_mode");
 	int select;
 	const int mval[2] = {RNA_int_get(op->ptr, "x"),
 	                     RNA_int_get(op->ptr, "y")};

@@ -4644,7 +4644,7 @@ static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 			copy_v3_v3(location, give_cursor(vc.scene, vc.v3d));
 		}
 
-		view3d_get_view_aligned_coordinate(vc.ar, location, event->mval, true);
+		ED_view3d_win_to_3d_int(vc.ar, location, event->mval, location);
 		RNA_float_set_array(op->ptr, "location", location);
 	}
 
@@ -6134,8 +6134,8 @@ int join_curve_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	DAG_relations_tag_update(bmain);   // because we removed object(s), call before editmode!
 	
-	ED_object_enter_editmode(C, EM_WAITCURSOR);
-	ED_object_exit_editmode(C, EM_FREEDATA | EM_WAITCURSOR | EM_DO_UNDO);
+	ED_object_editmode_enter(C, EM_WAITCURSOR);
+	ED_object_editmode_exit(C, EM_FREEDATA | EM_WAITCURSOR | EM_DO_UNDO);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
 
@@ -6150,20 +6150,20 @@ static const char *get_curve_defname(int type)
 
 	if ((type & CU_TYPE) == CU_BEZIER) {
 		switch (stype) {
-			case CU_PRIM_CURVE: return DATA_("BezierCurve");
-			case CU_PRIM_CIRCLE: return DATA_("BezierCircle");
-			case CU_PRIM_PATH: return DATA_("CurvePath");
+			case CU_PRIM_CURVE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "BezierCurve");
+			case CU_PRIM_CIRCLE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "BezierCircle");
+			case CU_PRIM_PATH: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "CurvePath");
 			default:
-				return DATA_("Curve");
+				return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "Curve");
 		}
 	}
 	else {
 		switch (stype) {
-			case CU_PRIM_CURVE: return DATA_("NurbsCurve");
-			case CU_PRIM_CIRCLE: return DATA_("NurbsCircle");
-			case CU_PRIM_PATH: return DATA_("NurbsPath");
+			case CU_PRIM_CURVE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "NurbsCurve");
+			case CU_PRIM_CIRCLE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "NurbsCircle");
+			case CU_PRIM_PATH: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "NurbsPath");
 			default:
-				return DATA_("Curve");
+				return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "Curve");
 		}
 	}
 }
@@ -6173,13 +6173,13 @@ static const char *get_surf_defname(int type)
 	int stype = type & CU_PRIMITIVE;
 
 	switch (stype) {
-		case CU_PRIM_CURVE: return DATA_("SurfCurve");
-		case CU_PRIM_CIRCLE: return DATA_("SurfCircle");
-		case CU_PRIM_PATCH: return DATA_("SurfPatch");
-		case CU_PRIM_SPHERE: return DATA_("SurfSphere");
-		case CU_PRIM_DONUT: return DATA_("SurfTorus");
+		case CU_PRIM_CURVE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "SurfCurve");
+		case CU_PRIM_CIRCLE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "SurfCircle");
+		case CU_PRIM_PATCH: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "SurfPatch");
+		case CU_PRIM_SPHERE: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "SurfSphere");
+		case CU_PRIM_DONUT: return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "SurfTorus");
 		default:
-			return DATA_("Surface");
+			return CTX_DATA_(BLF_I18NCONTEXT_ID_CURVE, "Surface");
 	}
 }
 
@@ -6603,7 +6603,7 @@ static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 
 	/* userdef */
 	if (newob && !enter_editmode) {
-		ED_object_exit_editmode(C, EM_FREEDATA);
+		ED_object_editmode_exit(C, EM_FREEDATA);
 	}
 
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);

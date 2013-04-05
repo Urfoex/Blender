@@ -359,7 +359,10 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		nsock->locx = locx + NODE_WIDTH(node);
 		/* place the socket circle in the middle of the layout */
 		nsock->locy = 0.5f * (dy + buty);
+		
 		dy = buty;
+		if (nsock->next)
+			dy -= NODE_SOCKDY;
 	}
 
 	node->prvr.xmin = locx + NODE_DYS;
@@ -443,7 +446,10 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		nsock->locx = locx;
 		/* place the socket circle in the middle of the layout */
 		nsock->locy = 0.5f * (dy + buty);
+		
 		dy = buty;
+		if (nsock->next)
+			dy -= NODE_SOCKDY;
 	}
 	
 	/* little bit space in end */
@@ -704,7 +710,7 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
 	
 	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glPixelZoom(scale, scale);
-	glaDrawPixelsTex(draw_rect.xmin, draw_rect.ymin, preview->xsize, preview->ysize, GL_UNSIGNED_BYTE, GL_LINEAR, preview->rect);
+	glaDrawPixelsTex(draw_rect.xmin, draw_rect.ymin, preview->xsize, preview->ysize, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, preview->rect);
 	glPixelZoom(1.0f, 1.0f);
 	
 	glDisable(GL_BLEND);
@@ -969,7 +975,19 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		glDisable(GL_LINE_SMOOTH);
 		glDisable(GL_BLEND);
 	}
-	
+
+	/* custom color inline */
+	if (node->flag & NODE_CUSTOM_COLOR) {
+		glEnable(GL_BLEND);
+		glEnable(GL_LINE_SMOOTH);
+
+		glColor3fv(node->color);
+		uiDrawBox(GL_LINE_LOOP, rct->xmin + 1, rct->ymin + 1, rct->xmax -1, rct->ymax - 1, hiddenrad);
+
+		glDisable(GL_LINE_SMOOTH);
+		glDisable(GL_BLEND);
+	}
+
 	/* title */
 	if (node->flag & SELECT) 
 		UI_ThemeColor(TH_SELECT);
@@ -1114,7 +1132,6 @@ static void node_draw(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeTre
 void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeTree *ntree, bNodeInstanceKey parent_key)
 {
 	bNode *node;
-	bNodeInstanceKey key;
 	bNodeLink *link;
 	int a;
 	
@@ -1128,6 +1145,7 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
 
 	/* draw background nodes, last nodes in front */
 	for (a = 0, node = ntree->nodes.first; node; node = node->next, a++) {
+		bNodeInstanceKey key;
 
 #ifdef USE_DRAW_TOT_UPDATE
 		/* unrelated to background nodes, update the v2d->tot,
@@ -1155,7 +1173,7 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
 	
 	/* draw foreground nodes, last nodes in front */
 	for (a = 0, node = ntree->nodes.first; node; node = node->next, a++) {
-		bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
+		bNodeInstanceKey key;
 		if (node->flag & NODE_BACKGROUND)
 			continue;
 

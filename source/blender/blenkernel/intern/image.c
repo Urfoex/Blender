@@ -1601,7 +1601,7 @@ static void stampdata(Scene *scene, Object *camera, StampData *stamp_data, int d
 		RenderStats *stats = re ? RE_GetStats(re) : NULL;
 
 		if (stats && (scene->r.stamp & R_STAMP_RENDERTIME)) {
-			BLI_timestr(stats->lastframetime, text);
+			BLI_timestr(stats->lastframetime, text, sizeof(text));
 
 			BLI_snprintf(stamp_data->rendertime, sizeof(stamp_data->rendertime), do_prefix ? "RenderTime %s" : "%s", text);
 		}
@@ -1819,7 +1819,7 @@ void BKE_stamp_buf(Scene *scene, Object *camera, unsigned char *rect, float *rec
 	}
 
 	/* cleanup the buffer. */
-	BLF_buffer(mono, NULL, NULL, 0, 0, 0, FALSE);
+	BLF_buffer(mono, NULL, NULL, 0, 0, 0, NULL);
 
 #undef BUFF_MARGIN_X
 #undef BUFF_MARGIN_Y
@@ -3011,7 +3011,7 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 					*lock_r = ima;
 
 					/* XXX anim play for viewer nodes not yet supported */
-					frame = 0; // XXX iuser?iuser->framenr:0;
+					frame = 0; // XXX iuser ? iuser->framenr : 0;
 					ibuf = image_get_ibuf(ima, 0, frame);
 
 					if (!ibuf) {
@@ -3379,7 +3379,7 @@ void BKE_image_get_aspect(Image *image, float *aspx, float *aspy)
 
 unsigned char *BKE_image_get_pixels_for_frame(struct Image *image, int frame)
 {
-	ImageUser iuser = {0};
+	ImageUser iuser = {NULL};
 	void *lock;
 	ImBuf *ibuf;
 	unsigned char *pixels = NULL;
@@ -3406,7 +3406,7 @@ unsigned char *BKE_image_get_pixels_for_frame(struct Image *image, int frame)
 
 float *BKE_image_get_float_pixels_for_frame(struct Image *image, int frame)
 {
-	ImageUser iuser = {0};
+	ImageUser iuser = {NULL};
 	void *lock;
 	ImBuf *ibuf;
 	float *pixels = NULL;
@@ -3429,4 +3429,16 @@ float *BKE_image_get_float_pixels_for_frame(struct Image *image, int frame)
 		return NULL;
 
 	return pixels;
+}
+
+int BKE_image_sequence_guess_offset(Image *image)
+{
+	unsigned short numlen;
+	char head[FILE_MAX], tail[FILE_MAX];
+	char num[FILE_MAX] = {0};
+
+	BLI_stringdec(image->name, head, tail, &numlen);
+	BLI_strncpy(num, image->name + strlen(head), numlen + 1);
+
+	return atoi(num);
 }
