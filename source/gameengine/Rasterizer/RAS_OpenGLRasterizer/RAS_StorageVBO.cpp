@@ -38,19 +38,20 @@ VBO::VBO(RAS_DisplayArray *data, unsigned int indices)
 	m_size = data->m_vertex.size();
 	m_indices = indices;
 	m_stride = sizeof(RAS_TexVert);
-	std::clog << "Assert: 128 == " << m_stride << std::endl;
-	std::clog << "Vertex size: " << m_data->m_vertex.size() << std::endl;
-	std::clog << "Vertex xyz: " << m_data->m_vertex.data()->getXYZ() << std::endl;
-	std::clog << "Vertex normal: " << m_data->m_vertex.data()->getNormal() << std::endl;
-	std::clog << "Vertex rgba: " << m_data->m_vertex.data()->getRGBA() << std::endl;
-	std::clog << "Vertex tangent: " << m_data->m_vertex.data()->getTangent() << std::endl;
-	std::clog << "Vertex uv: " << m_data->m_vertex.data()->getUV(0) << std::endl;
-	std::clog << "Vertex type: " << m_data->m_type << " " << m_data->TRIANGLE  << " " << m_data->QUAD << std::endl;
+// 	std::clog << "Assert: 128 == " << m_stride << std::endl;
+// 	std::clog << "Vertex size: " << m_data->m_vertex.size() << std::endl;
+// 	std::clog << "Vertex xyz: " << m_data->m_vertex.data()->getXYZ() << std::endl;
+// 	std::clog << "Vertex normal: " << m_data->m_vertex.data()->getNormal() << std::endl;
+// 	std::clog << "Vertex rgba: " << m_data->m_vertex.data()->getRGBA() << std::endl;
+// 	std::clog << "Vertex tangent: " << m_data->m_vertex.data()->getTangent() << std::endl;
+// 	std::clog << "Vertex uv: " << m_data->m_vertex.data()->getUV(0) << std::endl;
+// 	std::clog << "Vertex type: " << m_data->m_type << " " << m_data->TRIANGLE  << " " << m_data->QUAD << std::endl;
 
 	//	Determine drawmode
-	if (data->m_type == data->QUAD)
+	if (data->m_type == data->QUAD){
 		m_mode = GL_QUADS;
-	else if (data->m_type == data->TRIANGLE)
+		std::clog << "!Geometry shader with GL_TRIANGLES won't work. Convert your mesh or find some fitting GS-shader!\n";
+	}else if (data->m_type == data->TRIANGLE)
 		m_mode = GL_TRIANGLES;
 	else
 		m_mode = GL_LINE;
@@ -76,11 +77,11 @@ VBO::VBO(RAS_DisplayArray *data, unsigned int indices)
 	m_color_offset = m_data->m_vertex[0].RGBAOffset<GLvoid*>();
 	m_uv_offset = m_data->m_vertex[0].UVOffset<GLvoid*>();
 	
-	std::clog << "Vertex xyz offset: " << ((void*)(((RAS_TexVert*)0)->getXYZ())) << " " << m_vertex_offset << std::endl;
-	std::clog << "Vertex normal offset: " << ((void*)(((RAS_TexVert*)0)->getNormal())) << " " << m_normal_offset << std::endl;
-	std::clog << "Vertex rgba offset: " << ((void*)(((RAS_TexVert*)0)->getRGBA())) << " " << m_color_offset << std::endl;
-	std::clog << "Vertex tangent offset: " << ((void*)(((RAS_TexVert*)0)->getTangent())) << " " << m_tangent_offset << std::endl;
-	std::clog << "Vertex uv offset: " << ((void*)(((RAS_TexVert*)0)->getUV(0))) << " " << m_uv_offset << std::endl;
+// 	std::clog << "Vertex xyz offset: " << ((void*)(((RAS_TexVert*)0)->getXYZ())) << " " << m_vertex_offset << std::endl;
+// 	std::clog << "Vertex normal offset: " << ((void*)(((RAS_TexVert*)0)->getNormal())) << " " << m_normal_offset << std::endl;
+// 	std::clog << "Vertex rgba offset: " << ((void*)(((RAS_TexVert*)0)->getRGBA())) << " " << m_color_offset << std::endl;
+// 	std::clog << "Vertex tangent offset: " << ((void*)(((RAS_TexVert*)0)->getTangent())) << " " << m_tangent_offset << std::endl;
+// 	std::clog << "Vertex uv offset: " << ((void*)(((RAS_TexVert*)0)->getUV(0))) << " " << m_uv_offset << std::endl;
 }
 
 VBO::~VBO()
@@ -92,14 +93,14 @@ void VBO::UpdateData()
 {
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo[1]);
 	glBufferData(GL_ARRAY_BUFFER, m_stride*m_size, m_data->m_vertex.data(), GL_STATIC_DRAW);
-	std::clog << "Vertex data: " << m_stride*m_size << std::endl;
+// 	std::clog << "Vertex data: " << m_stride*m_size << std::endl;
 }
 
 void VBO::UpdateIndices()
 {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_vbo[0]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_data->m_index.size() * sizeof(m_data->m_index[0]), m_data->m_index.data(), GL_STATIC_DRAW);
-	std::clog << "Vertex id: " << m_data->m_index.size() * sizeof(m_data->m_index[0]) << std::endl;
+// 	std::clog << "Vertex id: " << m_data->m_index.size() * sizeof(m_data->m_index[0]) << std::endl;
 }
 
 void VBO::Draw(int texco_num, RAS_IRasterizer::TexCoGen* texco, int attrib_num, RAS_IRasterizer::TexCoGen* attrib, int *attrib_layer, bool multi)
@@ -111,7 +112,7 @@ void VBO::Draw(int texco_num, RAS_IRasterizer::TexCoGen* texco, int attrib_num, 
 	glBindBuffer(GL_ARRAY_BUFFER_ARB, m_vbo[1]);
 	
 	if( m_ShaderProgram != 0){
-		std::clog << "Using newer shader pipeline: " << m_ShaderProgram << "\n";
+// 		std::clog << "Using newer shader pipeline: " << m_ShaderProgram << "\n";
 		
 		GLuint positionID = glGetAttribLocation(m_ShaderProgram, "VertexPosition");
 		glEnableVertexAttribArray(positionID);
@@ -121,7 +122,7 @@ void VBO::Draw(int texco_num, RAS_IRasterizer::TexCoGen* texco, int attrib_num, 
 		
 		glDisableVertexAttribArray(positionID);
 	}else{
-		std::clog << "Using old pipeline.\n";
+// 		std::clog << "Using old pipeline.\n";
 		// Vertexes
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glVertexPointer(3, GL_FLOAT, m_stride, m_vertex_offset);
