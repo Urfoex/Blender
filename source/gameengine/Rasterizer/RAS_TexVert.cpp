@@ -140,13 +140,13 @@ bool RAS_TexVert::closeTo(const RAS_TexVert* other)
 	        );
 }
 
-short RAS_TexVert::getFlag() const
+GLshort RAS_TexVert::getFlag() const
 {
 	return m_flag;
 }
 
 
-unsigned int RAS_TexVert::getUnit() const
+GLuint RAS_TexVert::getUnit() const
 {
 	return m_unit;
 }

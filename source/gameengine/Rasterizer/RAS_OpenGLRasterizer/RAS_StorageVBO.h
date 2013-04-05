@@ -36,6 +36,9 @@
 
 #include "RAS_OpenGLRasterizer.h"
 
+#include <memory>
+#include <array>
+
 class VBO
 {
 public:
@@ -47,19 +50,19 @@ public:
 	void	UpdateData();
 	void	UpdateIndices();
 private:
-	RAS_DisplayArray*	data;
-	GLuint			size;
-	GLuint			stride;
-	GLuint			indices;
-	GLenum			mode;
-	GLuint			ibo;
-	GLuint			vbo_id;
+	RAS_DisplayArray*	m_data;
+	GLuint			m_size;
+	GLuint			m_stride;
+	GLuint			m_indices;
+	GLenum			m_mode;
+	std::array<GLuint,2> m_vbo;
 
-	void*			vertex_offset;
-	void*			normal_offset;
-	void*			color_offset;
-	void*			tangent_offset;
-	void*			uv_offset;
+	 
+	GLuint			m_vertex_offset;
+	GLuint			m_normal_offset;
+	GLuint			m_color_offset;
+	GLuint			m_tangent_offset;
+	GLuint			m_uv_offset;
 };
 
 class RAS_StorageVBO : public RAS_IStorage

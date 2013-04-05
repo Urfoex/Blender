@@ -1191,6 +1191,7 @@ GPUShader *GPU_shader_create(const char *vertexcode, const char *fragcode, const
 	if (vertexcode) {
 		const char *source[4];
 		int num_source = 0;
+		int ii = 0;
 
 		source[num_source++] = gpu_shader_standard_extensions();
 		source[num_source++] = gpu_shader_standard_defines();
@@ -1200,6 +1201,8 @@ GPUShader *GPU_shader_create(const char *vertexcode, const char *fragcode, const
 
 		glAttachObjectARB(shader->object, shader->vertex);
 		glShaderSourceARB(shader->vertex, num_source, source, NULL);
+		for( ii = 0; ii < num_source; ++ii)
+			printf("\nVertexShader %d: \n%s\n", ii, source[ii]);
 
 		glCompileShaderARB(shader->vertex);
 		glGetObjectParameterivARB(shader->vertex, GL_OBJECT_COMPILE_STATUS_ARB, &status);
@@ -1216,6 +1219,7 @@ GPUShader *GPU_shader_create(const char *vertexcode, const char *fragcode, const
 	if (fragcode) {
 		const char *source[5];
 		int num_source = 0;
+		int ii = 0;
 
 		source[num_source++] = gpu_shader_standard_extensions();
 		source[num_source++] = gpu_shader_standard_defines();
@@ -1226,6 +1230,8 @@ GPUShader *GPU_shader_create(const char *vertexcode, const char *fragcode, const
 
 		glAttachObjectARB(shader->object, shader->fragment);
 		glShaderSourceARB(shader->fragment, num_source, source, NULL);
+		for( ii = 0; ii < num_source; ++ii)
+			printf("\nFragmentShader %d: \n%s\n", ii, source[ii]);
 
 		glCompileShaderARB(shader->fragment);
 		glGetObjectParameterivARB(shader->fragment, GL_OBJECT_COMPILE_STATUS_ARB, &status);

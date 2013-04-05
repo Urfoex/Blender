@@ -196,7 +196,7 @@ PyObject *KX_VertexProxy::pyattr_get_uvs(void *self_v, const KX_PYATTRIBUTE_DEF 
 PyObject *KX_VertexProxy::pyattr_get_color(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_VertexProxy* self = static_cast<KX_VertexProxy*>(self_v);
-	const unsigned char *colp = self->m_vertex->getRGBA();
+	const unsigned char *colp = (const unsigned char *)self->m_vertex->getRGBA();
 	MT_Vector4 color(colp[0], colp[1], colp[2], colp[3]);
 	color /= 255.0;
 	return PyObjectFrom(color);
