@@ -68,12 +68,11 @@ public:
 		FLAT = 1,
 		MAX_UNIT = 8
 	};
-	
-	static GLuint PositionOffset(){return 0;};
-	static GLuint UVOffset(){return sizeof(m_localxyz);};
-	static GLuint RGBAOffset(){return sizeof(m_uvs) + UVOffset();};
-	static GLuint TangentOffset(){return sizeof(m_rgba) + RGBAOffset();};
-	static GLuint NormalOffset(){return sizeof(m_tangent) + TangentOffset();};
+	template<typename T> T PositionOffset(){return reinterpret_cast<T>(0);};
+	template<typename T> T UVOffset(){return reinterpret_cast<T>(sizeof(m_localxyz));};
+	template<typename T> T RGBAOffset(){return reinterpret_cast<T>(sizeof(m_uvs) + UVOffset<size_t>());};
+	template<typename T> T TangentOffset(){return reinterpret_cast<T>(sizeof(m_rgba) + RGBAOffset<size_t>());};
+	template<typename T> T NormalOffset(){return reinterpret_cast<T>(sizeof(m_tangent) + TangentOffset<size_t>());};
 
 	GLshort getFlag() const;
 	GLuint getUnit() const;

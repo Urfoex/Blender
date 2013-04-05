@@ -47,6 +47,9 @@
 #include "RAS_MeshObject.h"
 #include "RAS_Deformer.h"	// __NLA
 
+#include "RAS_OpenGLRasterizer/RAS_OpenGLRasterizer.h"
+#include "RAS_OpenGLRasterizer/RAS_StorageVBO.h"
+
 /* mesh slot */
 
 RAS_MeshSlot::RAS_MeshSlot() : SG_QList()
@@ -598,6 +601,7 @@ bool RAS_MaterialBucket::ActivateMaterial(const MT_Transform& cameratrans, RAS_I
 	return true;
 }
 
+
 void RAS_MaterialBucket::RenderMeshSlot(const MT_Transform& cameratrans, RAS_IRasterizer* rasty,
 	RAS_IRenderTools* rendertools, RAS_MeshSlot &ms)
 {
@@ -639,6 +643,10 @@ void RAS_MaterialBucket::RenderMeshSlot(const MT_Transform& cameratrans, RAS_IRa
 	else
 		ms.m_bDisplayList = true;
 
+	// TODO give shader to opengl->vbo
+	((RAS_OpenGLRasterizer*)rasty)->SetShader(m_material->GetShader());
+	
+	
 	// for text drawing using faces
 	if (m_material->GetDrawingMode() & RAS_IRasterizer::RAS_RENDER_3DPOLYGON_TEXT)
 		rasty->IndexPrimitives_3DText(ms, m_material, rendertools);

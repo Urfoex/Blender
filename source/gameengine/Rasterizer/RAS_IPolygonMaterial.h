@@ -185,6 +185,8 @@ public:
 	 * PreCalculate texture gen
 	 */
 	virtual void OnConstruction() {}
+	
+	virtual unsigned int GetShader()=0;
 
 
 #ifdef WITH_CXX_GUARDEDALLOC

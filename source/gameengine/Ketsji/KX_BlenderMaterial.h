@@ -97,6 +97,8 @@ public:
 	);
 	
 	virtual void Replace_IScene(SCA_IScene *val);
+	
+	virtual unsigned int GetShader(){if(mShader) return mShader->GetProg(); else return 0;};
 
 #ifdef WITH_PYTHON
 	// --------------------------------

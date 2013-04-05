@@ -128,6 +128,8 @@ public:
 		return &m_mcol;
 	}
 	virtual void GetMaterialRGBAColor(unsigned char *rgba) const;
+	
+	virtual unsigned int GetShader(){return 0;};
 
 #ifdef WITH_PYTHON
 	KX_PYMETHOD_DOC(KX_PolygonMaterial, updateTexture);

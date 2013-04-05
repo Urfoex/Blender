@@ -325,6 +325,8 @@ public:
 
 	virtual void	SetUsingOverrideShader(bool val);
 	virtual bool	GetUsingOverrideShader();
+	
+	void SetShader(GLuint shader);
 
 #ifdef WITH_CXX_GUARDEDALLOC
 	MEM_CXX_CLASS_ALLOC_FUNCS("GE:RAS_OpenGLRasterizer")

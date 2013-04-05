@@ -733,6 +733,7 @@ void RAS_OpenGLRasterizer::IndexPrimitives(RAS_MeshSlot& ms)
 // 	if (ms.m_pDerivedMesh)
 // 		m_failsafe_storage->IndexPrimitives(ms);
 // 	else
+	
 		m_storage->IndexPrimitives(ms);
 }
 
@@ -1054,3 +1055,7 @@ bool RAS_OpenGLRasterizer::GetUsingOverrideShader()
 	return m_usingoverrideshader;
 }
 
+#include "RAS_OpenGLRasterizer/RAS_StorageVBO.h"
+
+
+void RAS_OpenGLRasterizer::SetShader(GLuint shader){ ((RAS_StorageVBO*)m_storage)->m_ShaderProgram = shader; };

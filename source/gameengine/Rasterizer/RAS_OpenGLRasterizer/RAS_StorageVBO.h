@@ -49,6 +49,8 @@ public:
 
 	void	UpdateData();
 	void	UpdateIndices();
+	
+	GLuint m_ShaderProgram;
 private:
 	RAS_DisplayArray*	m_data;
 	GLuint			m_size;
@@ -58,11 +60,11 @@ private:
 	std::array<GLuint,2> m_vbo;
 
 	 
-	GLuint			m_vertex_offset;
-	GLuint			m_normal_offset;
-	GLuint			m_color_offset;
-	GLuint			m_tangent_offset;
-	GLuint			m_uv_offset;
+	GLvoid*			m_vertex_offset;
+	GLvoid*			m_normal_offset;
+	GLvoid*			m_color_offset;
+	GLvoid*			m_tangent_offset;
+	GLvoid*			m_uv_offset;
 };
 
 class RAS_StorageVBO : public RAS_IStorage
@@ -79,7 +81,8 @@ public:
 	virtual void	IndexPrimitivesMulti(RAS_MeshSlot& ms);
 
 	virtual void	SetDrawingMode(int drawingmode){m_drawingmode=drawingmode;};
-
+	
+	GLuint m_ShaderProgram;
 protected:
 	int				m_drawingmode;
 
