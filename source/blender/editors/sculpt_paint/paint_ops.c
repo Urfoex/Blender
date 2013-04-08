@@ -640,13 +640,13 @@ static int stencil_fit_image_aspect_exec(bContext *C, wmOperator *UNUSED(op))
 		float orig_area, stencil_area, factor;
 		ED_image_get_uv_aspect(ima, NULL, &aspx, &aspy);
 
-		orig_area = aspx*aspy;
-		stencil_area = br->stencil_dimension[0]*br->stencil_dimension[1];
+		orig_area = aspx * aspy;
+		stencil_area = br->stencil_dimension[0] * br->stencil_dimension[1];
 
-		factor = sqrt(stencil_area/orig_area);
+		factor = sqrt(stencil_area / orig_area);
 
-		br->stencil_dimension[0] = factor*aspx;
-		br->stencil_dimension[1] = factor*aspy;
+		br->stencil_dimension[0] = factor * aspx;
+		br->stencil_dimension[1] = factor * aspy;
 	}
 
 	return OPERATOR_FINISHED;
@@ -767,9 +767,10 @@ static void ed_keymap_paint_brush_size(wmKeyMap *keymap, const char *UNUSED(path
 }
 
 typedef enum {
-	RC_COLOR = 1,
+	RC_COLOR    = 1,
 	RC_ROTATION = 2,
-	RC_ZOOM = 4
+	RC_ZOOM     = 4,
+	RC_WEIGHT   = 8
 } RCFlags;
 
 static void set_brush_rc_path(PointerRNA *ptr, const char *brush_path,
@@ -829,8 +830,10 @@ static void ed_keymap_paint_brush_radial_control(wmKeyMap *keymap, const char *p
 	kmi = WM_keymap_add_item(keymap, "WM_OT_radial_control", FKEY, KM_PRESS, KM_SHIFT, 0);
 	set_brush_rc_props(kmi->ptr, paint, "strength", "use_unified_strength", flags_nozoom);
 
-	kmi = WM_keymap_add_item(keymap, "WM_OT_radial_control", WKEY, KM_PRESS, 0, 0);
-	set_brush_rc_props(kmi->ptr, paint, "weight", "use_unified_weight", flags_nozoom);
+	if (flags & RC_WEIGHT) {
+		kmi = WM_keymap_add_item(keymap, "WM_OT_radial_control", WKEY, KM_PRESS, 0, 0);
+		set_brush_rc_props(kmi->ptr, paint, "weight", "use_unified_weight", flags_nozoom);
+	}
 
 	if (flags & RC_ROTATION) {
 		kmi = WM_keymap_add_item(keymap, "WM_OT_radial_control", FKEY, KM_PRESS, KM_CTRL, 0);
@@ -979,7 +982,7 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 
 	ed_keymap_paint_brush_switch(keymap, "weight_paint");
 	ed_keymap_paint_brush_size(keymap, "tool_settings.weight_paint.brush.size");
-	ed_keymap_paint_brush_radial_control(keymap, "weight_paint", 0);
+	ed_keymap_paint_brush_radial_control(keymap, "weight_paint", RC_WEIGHT);
 
 	ed_keymap_stencil(keymap);
 
@@ -992,8 +995,6 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 	/* note, conflicts with vertex paint, but this is more useful */
 	kmi = WM_keymap_add_item(keymap, "WM_OT_context_toggle", VKEY, KM_PRESS, 0, 0); /* vert mask toggle */
 	RNA_string_set(kmi->ptr, "data_path", "weight_paint_object.data.use_paint_mask_vertex");
-
-	WM_keymap_verify_item(keymap, "PAINT_OT_weight_from_bones", WKEY, KM_PRESS, 0, 0);
 
 	kmi = WM_keymap_add_item(keymap, "WM_OT_context_toggle", SKEY, KM_PRESS, KM_SHIFT, 0);
 	RNA_string_set(kmi->ptr, "data_path", "tool_settings.weight_paint.brush.use_smooth_stroke");

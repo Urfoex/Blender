@@ -645,6 +645,10 @@ static int ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut
 				/* still stuff needs to be copied */
 				oldbut->rect = but->rect;
 				oldbut->context = but->context; /* set by Layout */
+
+				/* drawing */
+				oldbut->icon = but->icon;
+				oldbut->iconadd = but->iconadd;
 				
 				/* typically the same pointers, but not on undo/redo */
 				/* XXX some menu buttons store button itself in but->poin. Ugly */
@@ -1984,7 +1988,7 @@ static double soft_range_round_down(double value, double max)
 /* note: this could be split up into functions which handle arrays and not */
 static void ui_set_but_soft_range(uiBut *but)
 {
-	/* ideally we would not limit this but practically, its more then
+	/* ideally we would not limit this but practically, its more than
 	 * enough worst case is very long vectors wont use a smart soft-range
 	 * which isn't so bad. */
 
