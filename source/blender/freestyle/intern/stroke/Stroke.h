@@ -39,6 +39,7 @@
 #include "../system/FreestyleConfig.h"
 #include "../system/StringUtils.h"
 
+namespace Freestyle {
 
 //
 //  StrokeAttribute
@@ -519,7 +520,7 @@ private:
 	float _Length; // The stroke length
 	viewedge_container _ViewEdges;
 	float _sampling;
-	StrokeRenderer *_renderer; // mark implementation OpenGL renderer
+	// StrokeRenderer *_renderer; // mark implementation OpenGL renderer
 	MediumType _mediumType;
 	unsigned int _textureId;
 	bool _tips;
@@ -811,5 +812,7 @@ Stroke::Stroke(InputVertexIterator iBegin, InputVertexIterator iEnd)
 	_Length = 0;
 	_id = 0;
 }
+
+} /* namespace Freestyle */
 
 #endif // __FREESTYLE_STROKE_H__

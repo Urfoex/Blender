@@ -31,6 +31,8 @@
 #include "../system/PseudoNoise.h"
 #include "../system/RandGen.h"
 
+namespace Freestyle {
+
 /////////////////////////////////////////
 //
 //  CALLIGRAPHICS SHADER
@@ -46,8 +48,6 @@ CalligraphicShader::CalligraphicShader(real iMinThickness, real iMaxThickness, c
 	_orientation.normalize();
 	_clamp = clamp;
 }
-
-float ksinToto = 0.0f;
 
 int CalligraphicShader::shade(Stroke &ioStroke) const
 {
@@ -395,3 +395,5 @@ void Omitter::omit(real sizeWindow, real thrVari, real thrFlat, real lFlat)
 }
 
 #endif
+
+} /* namespace Freestyle */

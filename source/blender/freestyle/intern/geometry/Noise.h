@@ -32,10 +32,13 @@
 
 #include "../system/FreestyleConfig.h"
 
+using namespace std;
+
+namespace Freestyle {
+
 #define _NOISE_B 0x100
 
 using namespace Geometry;
-using namespace std;
 
 /*! Class to provide Perlin Noise functionalities */
 class LIB_GEOMETRY_EXPORT Noise
@@ -70,7 +73,10 @@ private:
 	float g3[_NOISE_B + _NOISE_B + 2][3];
 	float g2[_NOISE_B + _NOISE_B + 2][2];
 	float g1[_NOISE_B + _NOISE_B + 2];
-	int start;
+	/* UNUSED */
+	// int start;
 };
+
+} /* namespace Freestyle */
 
 #endif // __NOISE_H__

@@ -37,6 +37,9 @@
 #include "../geometry/Geom.h"
 
 using namespace std;
+
+namespace Freestyle {
+
 using namespace Geometry;
 
 namespace StrokeShaders {
@@ -444,7 +447,8 @@ public:
 class LIB_STROKE_EXPORT CalligraphicColorShader : public StrokeShader
 {
 private:
-	int _textureId;
+	/* UNUSED */
+	//  int _textureId;
 	Vec2d _orientation;
 
 public:
@@ -891,5 +895,7 @@ public:
 };
 
 } // end of namespace StrokeShaders
+
+} /* namespace Freestyle */
 
 #endif // __FREESTYLE_BASIC_STROKE_SHADERS_H__

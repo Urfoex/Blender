@@ -43,6 +43,8 @@
 
 #include "../system/FreestyleConfig.h"
 
+namespace Freestyle {
+
 using namespace Geometry;
 
 namespace OGF {
@@ -115,7 +117,8 @@ public:
 	}
 
 private:
-	real center_[3];
+	/* UNUSED */
+	// real center_[3];
 	Vec3r axis_[3];
 	real eigen_value_[3];
 	real M_[6];
@@ -137,5 +140,7 @@ inline void NormalCycle::accumulate_dihedral_angle(const Vec3r& edge, const doub
 //_________________________________________________________
 
 }  // OGF namespace
+
+} /* namespace Freestyle */
 
 #endif  // __MESH_TOOLS_MATH_NORMAL_CYCLE__
