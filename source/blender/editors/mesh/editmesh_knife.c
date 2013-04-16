@@ -47,6 +47,8 @@
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_context.h"
+#include "BKE_editmesh.h"
+#include "BKE_editmesh_bvh.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h" /* for paint cursor */
@@ -60,7 +62,6 @@
 #include "WM_types.h"
 
 #include "DNA_object_types.h"
-#include "BKE_editmesh.h"
 #include "UI_resources.h"
 
 #include "RNA_access.h"
@@ -1175,7 +1176,7 @@ static BMEdgeHit *knife_edge_tri_isect(KnifeTool_OpData *kcd, BMBVHTree *bmtree,
                                        const float v1[3],  const float v2[3], const float v3[3],
                                        SmallHash *ehash, bglMats *mats, int *count)
 {
-	BVHTree *tree2 = BLI_bvhtree_new(3, FLT_EPSILON * 4, 8, 8), *tree = BMBVH_BVHTree(bmtree);
+	BVHTree *tree2 = BLI_bvhtree_new(3, FLT_EPSILON * 4, 8, 8), *tree = BKE_bmbvh_tree_get(bmtree);
 	BMEdgeHit *edges = NULL;
 	BLI_array_declare(edges);
 	BVHTreeOverlap *results, *result;
@@ -1267,7 +1268,7 @@ static BMEdgeHit *knife_edge_tri_isect(KnifeTool_OpData *kcd, BMBVHTree *bmtree,
 					add_v3_v3(p1, no);
 						
 					/* ray cast */
-					f_hit = BMBVH_RayCast(bmtree, p1, no, NULL, NULL);
+					f_hit = BKE_bmbvh_ray_cast(bmtree, p1, no, NULL, NULL);
 				}
 
 				/* ok, if visible add the new point */
@@ -1501,7 +1502,7 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd, float co[3], float
 	knife_input_ray_segment(kcd, kcd->curr.mval, 1.0f, origin, origin_ofs);
 	sub_v3_v3v3(ray, origin_ofs, origin);
 
-	f = BMBVH_RayCast(kcd->bmbvh, origin, ray, co, cageco);
+	f = BKE_bmbvh_ray_cast(kcd->bmbvh, origin, ray, co, cageco);
 
 	if (is_space)
 		*is_space = !f;
@@ -1860,12 +1861,12 @@ typedef struct facenet_entry {
 	KnifeEdge *kfe;
 } facenet_entry;
 
-static void rnd_offset_co(float co[3], float scale)
+static void rnd_offset_co(RNG *rng, float co[3], float scale)
 {
 	int i;
 
 	for (i = 0; i < 3; i++) {
-		co[i] += (BLI_frand() - 0.5) * scale;
+		co[i] += (BLI_rng_get_float(rng) - 0.5) * scale;
 	}
 }
 
@@ -1966,6 +1967,7 @@ static void knifenet_fill_faces(KnifeTool_OpData *kcd)
 	BMFace **faces = MEM_callocN(sizeof(BMFace *) * bm->totface, "faces knife");
 	MemArena *arena = BLI_memarena_new(1 << 16, "knifenet_fill_faces");
 	SmallHash shash;
+	RNG *rng;
 	int i, j, k = 0, totface = bm->totface;
 
 	BMO_push(bm, NULL);
@@ -2065,7 +2067,7 @@ static void knifenet_fill_faces(KnifeTool_OpData *kcd)
 		}
 	}
 
-	BLI_srand(0);
+	rng = BLI_rng_new(0);
 
 	for (i = 0; i < totface; i++) {
 		SmallHash *hash = &shash;
@@ -2086,7 +2088,7 @@ static void knifenet_fill_faces(KnifeTool_OpData *kcd)
 			if (!BLI_smallhash_haskey(hash, (intptr_t)entry->kfe->v1)) {
 				sf_vert = BLI_scanfill_vert_add(&sf_ctx, entry->kfe->v1->v->co);
 				sf_vert->poly_nr = 0;
-				rnd_offset_co(sf_vert->co, rndscale);
+				rnd_offset_co(rng, sf_vert->co, rndscale);
 				sf_vert->tmp.p = entry->kfe->v1->v;
 				BLI_smallhash_insert(hash, (intptr_t)entry->kfe->v1, sf_vert);
 			}
@@ -2094,7 +2096,7 @@ static void knifenet_fill_faces(KnifeTool_OpData *kcd)
 			if (!BLI_smallhash_haskey(hash, (intptr_t)entry->kfe->v2)) {
 				sf_vert = BLI_scanfill_vert_add(&sf_ctx, entry->kfe->v2->v->co);
 				sf_vert->poly_nr = 0;
-				rnd_offset_co(sf_vert->co, rndscale);
+				rnd_offset_co(rng, sf_vert->co, rndscale);
 				sf_vert->tmp.p = entry->kfe->v2->v;
 				BLI_smallhash_insert(hash, (intptr_t)entry->kfe->v2, sf_vert);
 			}
@@ -2201,6 +2203,7 @@ static void knifenet_fill_faces(KnifeTool_OpData *kcd)
 	if (faces)
 		MEM_freeN(faces);
 	BLI_memarena_free(arena);
+	BLI_rng_free(rng);
 
 	BMO_error_clear(bm); /* remerge_faces sometimes raises errors, so make sure to clear them */
 
@@ -2929,7 +2932,7 @@ static void knifetool_exit_ex(bContext *C, KnifeTool_OpData *kcd)
 	BLI_ghash_free(kcd->origvertmap, NULL, NULL);
 	BLI_ghash_free(kcd->kedgefacemap, NULL, NULL);
 
-	BMBVH_FreeBVH(kcd->bmbvh);
+	BKE_bmbvh_free(kcd->bmbvh);
 	BLI_memarena_free(kcd->arena);
 
 	/* tag for redraw */
@@ -2997,7 +3000,7 @@ static void knifetool_init(bContext *C, KnifeTool_OpData *kcd,
 
 	em_setup_viewcontext(C, &kcd->vc);
 
-	kcd->em = BMEdit_FromObject(kcd->ob);
+	kcd->em = BKE_editmesh_from_object(kcd->ob);
 
 	BM_mesh_elem_index_ensure(kcd->em->bm, BM_VERT);
 
@@ -3011,10 +3014,10 @@ static void knifetool_init(bContext *C, KnifeTool_OpData *kcd,
 	cage->foreachMappedVert(cage, cage_mapped_verts_callback, data);
 	BLI_smallhash_release(&shash);
 
-	kcd->bmbvh = BMBVH_NewBVH(kcd->em,
+	kcd->bmbvh = BKE_bmbvh_new(kcd->em,
 	                          (BMBVH_USE_CAGE | BMBVH_RETURN_ORIG) |
 	                          (only_select ? BMBVH_RESPECT_SELECT : BMBVH_RESPECT_HIDDEN),
-	                          scene, obedit);
+	                          scene);
 
 	kcd->arena = BLI_memarena_new(1 << 15, "knife");
 	kcd->vthresh = KMAXDIST - 1;
@@ -3154,7 +3157,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	KnifeTool_OpData *kcd = op->customdata;
 	bool do_refresh = false;
 
-	if (!obedit || obedit->type != OB_MESH || BMEdit_FromObject(obedit) != kcd->em) {
+	if (!obedit || obedit->type != OB_MESH || BKE_editmesh_from_object(obedit) != kcd->em) {
 		knifetool_exit(C, op);
 		ED_area_headerprint(CTX_wm_area(C), NULL);
 		return OPERATOR_FINISHED;

@@ -25,41 +25,31 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/mesh/editmesh_bvh.h
- *  \ingroup edmesh
+/** \file BKE_editmesh_bvh.h
+ *  \ingroup bke
  */
 
-#ifndef __EDITBMESH_BVH_H__
-#define __EDITBMESH_BVH_H__
+#ifndef __BKE_EDITMESH_BVH_H__
+#define __BKE_EDITMESH_BVH_H__
 
 struct BMEditMesh;
 struct BMFace;
-struct BMEdge;
 struct BMVert;
-struct RegionView3D;
 struct BMBVHTree;
 struct BVHTree;
 struct Scene;
-struct Object;
 
-#ifndef IN_EDITMESHBVH
 typedef struct BMBVHTree BMBVHTree;
-#endif
 
-struct BMBVHTree *BMBVH_NewBVH(struct BMEditMesh *em, int flag, struct Scene *scene, struct Object *obedit);
-void BMBVH_FreeBVH(struct BMBVHTree *tree);
-struct BVHTree *BMBVH_BVHTree(struct BMBVHTree *tree);
+BMBVHTree      *BKE_bmbvh_new(struct BMEditMesh *em, int flag, struct Scene *scene);
+void            BKE_bmbvh_free(BMBVHTree *tree);
+struct BVHTree *BKE_bmbvh_tree_get(BMBVHTree *tree);
+struct BMFace  *BKE_bmbvh_ray_cast(BMBVHTree *tree, const float co[3], const float dir[3],
+                                   float r_hitout[3], float r_cagehit[3]);
+/* find a vert closest to co in a sphere of radius maxdist */
+struct BMVert  *BKE_bmbvh_find_vert_closest(BMBVHTree *tree, const float co[3], const float maxdist);
 
-struct BMFace *BMBVH_RayCast(struct BMBVHTree *tree, const float co[3], const float dir[3],
-                             float r_hitout[3], float r_cagehit[3]);
-
-int BMBVH_EdgeVisible(struct BMBVHTree *tree, struct BMEdge *e, 
-                      struct ARegion *ar, struct View3D *v3d, struct Object *obedit);
-
-/*find a vert closest to co in a sphere of radius maxdist*/
-struct BMVert *BMBVH_FindClosestVert(struct BMBVHTree *tree, const float co[3], const float maxdist);
-
-/* BMBVH_NewBVH flag parameter */
+/* BKE_bmbvh_new flag parameter */
 enum {
 	BMBVH_USE_CAGE        = 1, /* project geometry onto modifier cage */
 	BMBVH_RETURN_ORIG     = 2, /* use with BMBVH_USE_CAGE, returns hits in relation to original geometry */
@@ -67,4 +57,4 @@ enum {
 	BMBVH_RESPECT_HIDDEN  = 8  /* omit hidden geometry */
 };
 
-#endif /* __EDITBMESH_BVH_H__ */
+#endif  /* __BKE_EDITMESH_BVH_H__ */

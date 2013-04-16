@@ -25,16 +25,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/mesh/editmesh_bvh.c
- *  \ingroup edmesh
+/** \file blender/blenkernel/intern/editmesh_bvh.c
+ *  \ingroup bke
  */
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_scene_types.h"
 #include "DNA_object_types.h"
-#include "DNA_screen_types.h"
-#include "DNA_view3d_types.h"
 
 #include "BLI_math.h"
 #include "BLI_smallhash.h"
@@ -42,10 +39,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_editmesh.h"
 
-#include "ED_view3d.h"
-
-#define IN_EDITMESHBVH     /* needed for typedef workaround */
-#include "editmesh_bvh.h"  /* own include */
+#include "BKE_editmesh_bvh.h"  /* own include */
 
 
 typedef struct BMBVHTree {
@@ -64,7 +58,7 @@ typedef struct BMBVHTree {
 	int curtag, flag;
 	
 	Object *ob;
-	Scene *scene;
+	struct Scene *scene;
 } BMBVHTree;
 
 static void cage_mapped_verts_callback(void *userData, int index, const float co[3],
@@ -81,7 +75,7 @@ static void cage_mapped_verts_callback(void *userData, int index, const float co
 	}
 }
 
-BMBVHTree *BMBVH_NewBVH(BMEditMesh *em, int flag, Scene *scene, Object *obedit)
+BMBVHTree *BKE_bmbvh_new(BMEditMesh *em, int flag, struct Scene *scene)
 {
 	BMBVHTree *tree = MEM_callocN(sizeof(*tree), "BMBVHTree");
 	DerivedMesh *cage, *final;
@@ -94,9 +88,9 @@ BMBVHTree *BMBVH_NewBVH(BMEditMesh *em, int flag, Scene *scene, Object *obedit)
 	 * so that e.g. mirror or array use original vertex coordinates and not mirrored or duplicate */
 	BLI_smallhash_init(&shash);
 	
-	BMEdit_RecalcTessellation(em);
+	BKE_editmesh_tessface_calc(em);
 
-	tree->ob = obedit;
+	tree->ob = em->ob;
 	tree->scene = scene;
 	tree->em = em;
 	tree->bm = em->bm;
@@ -138,7 +132,7 @@ BMBVHTree *BMBVH_NewBVH(BMEditMesh *em, int flag, Scene *scene, Object *obedit)
 		em->bm->elem_index_dirty &= ~BM_VERT;
 
 
-		cage = editbmesh_get_derived_cage_and_final(scene, obedit, em, &final, CD_MASK_DERIVEDMESH);
+		cage = editbmesh_get_derived_cage_and_final(scene, em->ob, em, &final, CD_MASK_DERIVEDMESH);
 		cagecos = MEM_callocN(sizeof(float) * 3 * em->bm->totvert, "bmbvh cagecos");
 		
 		data[0] = em;
@@ -186,7 +180,7 @@ BMBVHTree *BMBVH_NewBVH(BMEditMesh *em, int flag, Scene *scene, Object *obedit)
 	return tree;
 }
 
-void BMBVH_FreeBVH(BMBVHTree *tree)
+void BKE_bmbvh_free(BMBVHTree *tree)
 {
 	BLI_bvhtree_free(tree->tree);
 	
@@ -238,8 +232,8 @@ static void raycallback(void *userdata, int index, const BVHTreeRay *ray, BVHTre
 	}
 }
 
-BMFace *BMBVH_RayCast(BMBVHTree *tree, const float co[3], const float dir[3],
-                      float r_hitout[3], float r_cagehit[3])
+BMFace *BKE_bmbvh_ray_cast(BMBVHTree *tree, const float co[3], const float dir[3],
+                           float r_hitout[3], float r_cagehit[3])
 {
 	BVHTreeRayHit hit;
 
@@ -279,7 +273,7 @@ BMFace *BMBVH_RayCast(BMBVHTree *tree, const float co[3], const float dir[3],
 	return NULL;
 }
 
-BVHTree *BMBVH_BVHTree(BMBVHTree *tree)
+BVHTree *BKE_bmbvh_tree_get(BMBVHTree *tree)
 {
 	return tree->tree;
 }
@@ -306,7 +300,7 @@ static void vertsearchcallback(void *userdata, int index, const float *UNUSED(co
 	}
 }
 
-BMVert *BMBVH_FindClosestVert(BMBVHTree *tree, const float co[3], const float maxdist)
+BMVert *BKE_bmbvh_find_vert_closest(BMBVHTree *tree, const float co[3], const float maxdist)
 {
 	BVHTreeNearest hit;
 
@@ -360,86 +354,3 @@ static short winding(const float v1[3], const float v2[3], const float v3[3])
 	return 1;
 }
 #endif
-
-#if 0 //BMESH_TODO: not implemented yet
-int BMBVH_VertVisible(BMBVHTree *tree, BMEdge *e, RegionView3D *r3d)
-{
-
-}
-#endif
-
-static BMFace *edge_ray_cast(BMBVHTree *tree, const float co[3], const float dir[3], float *r_hitout, BMEdge *e)
-{
-	BMFace *f = BMBVH_RayCast(tree, co, dir, r_hitout, NULL);
-	
-	if (f && BM_edge_in_face(f, e))
-		return NULL;
-
-	return f;
-}
-
-static void scale_point(float c1[3], const float p[3], const float s)
-{
-	sub_v3_v3(c1, p);
-	mul_v3_fl(c1, s);
-	add_v3_v3(c1, p);
-}
-
-
-int BMBVH_EdgeVisible(BMBVHTree *tree, BMEdge *e, ARegion *ar, View3D *v3d, Object *obedit)
-{
-	BMFace *f;
-	float co1[3], co2[3], co3[3], dir1[3], dir2[3], dir3[3];
-	float origin[3], invmat[4][4];
-	float epsilon = 0.01f; 
-	float end[3];
-	const float mval_f[2] = {ar->winx / 2.0f,
-	                         ar->winy / 2.0f};
-
-	ED_view3d_win_to_segment(ar, v3d, mval_f, origin, end);
-	
-	invert_m4_m4(invmat, obedit->obmat);
-	mul_m4_v3(invmat, origin);
-
-	copy_v3_v3(co1, e->v1->co);
-	mid_v3_v3v3(co2, e->v1->co, e->v2->co);
-	copy_v3_v3(co3, e->v2->co);
-	
-	scale_point(co1, co2, 0.99);
-	scale_point(co3, co2, 0.99);
-	
-	/* ok, idea is to generate rays going from the camera origin to the 
-	 * three points on the edge (v1, mid, v2)*/
-	sub_v3_v3v3(dir1, origin, co1);
-	sub_v3_v3v3(dir2, origin, co2);
-	sub_v3_v3v3(dir3, origin, co3);
-	
-	normalize_v3(dir1);
-	normalize_v3(dir2);
-	normalize_v3(dir3);
-
-	mul_v3_fl(dir1, epsilon);
-	mul_v3_fl(dir2, epsilon);
-	mul_v3_fl(dir3, epsilon);
-	
-	/* offset coordinates slightly along view vectors, to avoid
-	 * hitting the faces that own the edge.*/
-	add_v3_v3v3(co1, co1, dir1);
-	add_v3_v3v3(co2, co2, dir2);
-	add_v3_v3v3(co3, co3, dir3);
-
-	normalize_v3(dir1);
-	normalize_v3(dir2);
-	normalize_v3(dir3);
-
-	/* do three samplings: left, middle, right */
-	f = edge_ray_cast(tree, co1, dir1, NULL, e);
-	if (f && !edge_ray_cast(tree, co2, dir2, NULL, e))
-		return 1;
-	else if (f && !edge_ray_cast(tree, co3, dir3, NULL, e))
-		return 1;
-	else if (!f)
-		return 1;
-
-	return 0;
-}
