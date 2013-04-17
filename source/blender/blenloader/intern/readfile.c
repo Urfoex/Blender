@@ -6209,9 +6209,9 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 				v3d->properties_storage = NULL;
 				v3d->defmaterial = NULL;
 				
-				/* render can be quite heavy, set to wire on load */
+				/* render can be quite heavy, set to solid on load */
 				if (v3d->drawtype == OB_RENDER)
-					v3d->drawtype = OB_WIRE;
+					v3d->drawtype = OB_SOLID;
 				
 				blo_do_versions_view3d_split_250(v3d, &sl->regionbase);
 			}
@@ -9264,6 +9264,18 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				brush->spacing /= 2;
 			}
 		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 266, 6)) {
+		Brush *brush;
+		#define BRUSH_TEXTURE_OVERLAY (1 << 21)
+
+		for (brush = main->brush.first; brush; brush = brush->id.next) {
+			brush->overlay_flags = 0;
+			if (brush->flag & BRUSH_TEXTURE_OVERLAY)
+				brush->overlay_flags |= (BRUSH_OVERLAY_PRIMARY | BRUSH_OVERLAY_CURSOR);
+		}
+		#undef BRUSH_TEXTURE_OVERLAY
 	}
 
 	if (main->versionfile < 267) {
