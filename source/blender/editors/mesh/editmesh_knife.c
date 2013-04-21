@@ -209,7 +209,7 @@ typedef struct KnifeTool_OpData {
 		ANGLE_135
 	} angle_snapping;
 
-	float (*cagecos)[3];
+	const float (*cagecos)[3];
 } KnifeTool_OpData;
 
 static ListBase *knife_get_face_kedges(KnifeTool_OpData *kcd, BMFace *f);
@@ -327,7 +327,7 @@ static BMFace *knife_find_common_face(ListBase *faces1, ListBase *faces2)
 	return NULL;
 }
 
-static KnifeVert *new_knife_vert(KnifeTool_OpData *kcd, const float co[3], float *cageco)
+static KnifeVert *new_knife_vert(KnifeTool_OpData *kcd, const float co[3], const float cageco[3])
 {
 	KnifeVert *kfv = BLI_mempool_calloc(kcd->kverts);
 
@@ -2939,7 +2939,7 @@ static void knifetool_exit_ex(bContext *C, KnifeTool_OpData *kcd)
 	ED_region_tag_redraw(kcd->ar);
 
 	if (kcd->cagecos)
-		MEM_freeN(kcd->cagecos);
+		MEM_freeN((void *)kcd->cagecos);
 
 	if (kcd->linehits)
 		MEM_freeN(kcd->linehits);
@@ -2952,20 +2952,6 @@ static void knifetool_exit(bContext *C, wmOperator *op)
 	KnifeTool_OpData *kcd = op->customdata;
 	knifetool_exit_ex(C, kcd);
 	op->customdata = NULL;
-}
-
-static void cage_mapped_verts_callback(void *userData, int index, const float co[3],
-                                       const float UNUSED(no_f[3]), const short UNUSED(no_s[3]))
-{
-	void **data = userData;
-	BMEditMesh *em = data[0];
-	float (*cagecos)[3] = data[1];
-	SmallHash *hash = data[2];
-
-	if (index >= 0 && index < em->bm->totvert && !BLI_smallhash_haskey(hash, index)) {
-		BLI_smallhash_insert(hash, index, NULL);
-		copy_v3_v3(cagecos[index], co);
-	}
 }
 
 static void knifetool_update_mval(KnifeTool_OpData *kcd, const float mval[2])
@@ -2990,9 +2976,6 @@ static void knifetool_init(bContext *C, KnifeTool_OpData *kcd,
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	DerivedMesh *cage, *final;
-	SmallHash shash;
-	void *data[3];
 
 	/* assign the drawing handle for drawing preview line... */
 	kcd->ob = obedit;
@@ -3004,20 +2987,12 @@ static void knifetool_init(bContext *C, KnifeTool_OpData *kcd,
 
 	BM_mesh_elem_index_ensure(kcd->em->bm, BM_VERT);
 
-	cage = editbmesh_get_derived_cage_and_final(scene, obedit, kcd->em, &final, CD_MASK_DERIVEDMESH);
-	kcd->cagecos = MEM_callocN(sizeof(float) * 3 * kcd->em->bm->totvert, "knife cagecos");
-	data[0] = kcd->em;
-	data[1] = kcd->cagecos;
-	data[2] = &shash;
-
-	BLI_smallhash_init(&shash);
-	cage->foreachMappedVert(cage, cage_mapped_verts_callback, data);
-	BLI_smallhash_release(&shash);
+	kcd->cagecos = (const float (*)[3])BKE_editmesh_vertexCos_get(kcd->em, scene, NULL);
 
 	kcd->bmbvh = BKE_bmbvh_new(kcd->em,
-	                          (BMBVH_USE_CAGE | BMBVH_RETURN_ORIG) |
+	                          BMBVH_RETURN_ORIG |
 	                          (only_select ? BMBVH_RESPECT_SELECT : BMBVH_RESPECT_HIDDEN),
-	                          scene);
+	                          kcd->cagecos, false);
 
 	kcd->arena = BLI_memarena_new(1 << 15, "knife");
 	kcd->vthresh = KMAXDIST - 1;

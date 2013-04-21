@@ -159,8 +159,7 @@ enum PathTraceDimension {
 	PRNG_LIGHT_V = 5,
 	PRNG_LIGHT_F = 6,
 	PRNG_TERMINATE = 7,
-	PRNG_BOUNCE_NUM = 8,
-	PRNG_STOCHASTIC_HAIR = 9
+	PRNG_BOUNCE_NUM = 8
 };
 
 /* these flags values correspond to raytypes in osl.cpp, so keep them in sync!
@@ -714,7 +713,10 @@ typedef struct KernelBVH {
 	int root;
 	int attributes_map_stride;
 	int have_motion;
-	int pad2;
+	int have_curves;
+	int have_instancing;
+
+	int pad1, pad2, pad3;
 } KernelBVH;
 
 typedef enum CurveFlag {

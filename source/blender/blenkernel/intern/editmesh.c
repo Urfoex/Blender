@@ -61,6 +61,7 @@ BMEditMesh *BKE_editmesh_copy(BMEditMesh *em)
 
 	em_copy->derivedCage = em_copy->derivedFinal = NULL;
 	em_copy->derivedVertColor = NULL;
+	em_copy->derivedFaceColor = NULL;
 
 	em_copy->bm = BM_mesh_copy(em->bm);
 
@@ -326,7 +327,7 @@ void BKE_editmesh_free(BMEditMesh *em)
 		em->derivedCage = NULL;
 	}
 
-	if (em->derivedVertColor) MEM_freeN(em->derivedVertColor);
+	BKE_editmesh_color_free(em);
 
 	if (em->looptris) MEM_freeN(em->looptris);
 
@@ -336,4 +337,38 @@ void BKE_editmesh_free(BMEditMesh *em)
 
 	if (em->bm)
 		BM_mesh_free(em->bm);
+}
+
+void BKE_editmesh_color_free(BMEditMesh *em)
+{
+	if (em->derivedVertColor) MEM_freeN(em->derivedVertColor);
+	if (em->derivedFaceColor) MEM_freeN(em->derivedFaceColor);
+	em->derivedVertColor = NULL;
+	em->derivedFaceColor = NULL;
+
+	em->derivedVertColorLen = 0;
+	em->derivedFaceColorLen = 0;
+
+}
+
+void BKE_editmesh_color_ensure(BMEditMesh *em, const char htype)
+{
+	switch (htype) {
+		case BM_VERT:
+			if (em->derivedVertColorLen != em->bm->totvert) {
+				BKE_editmesh_color_free(em);
+				em->derivedVertColor = MEM_mallocN(sizeof(*em->derivedVertColor) * em->bm->totvert, __func__);
+				em->derivedVertColorLen = em->bm->totvert;
+			}
+			break;
+		case BM_FACE:
+			if (em->derivedFaceColorLen != em->bm->totface) {
+				BKE_editmesh_color_free(em);
+				em->derivedFaceColor = MEM_mallocN(sizeof(*em->derivedFaceColor) * em->bm->totface, __func__);
+				em->derivedFaceColorLen = em->bm->totface;
+			}
+			break;
+		default:
+			BLI_assert(0);
+	}
 }

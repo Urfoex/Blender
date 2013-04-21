@@ -53,6 +53,7 @@
 #include "BKE_pbvh.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
+#include "BKE_editmesh.h"
 #include "BKE_key.h"
 #include "BKE_modifier.h"
 #include "BKE_mesh.h"
@@ -1204,14 +1205,8 @@ void DM_update_weight_mcol(Object *ob, DerivedMesh *dm, int const draw_flag,
 	int i;
 
 	if (em) {
-		if (em->derivedVertColor && em->derivedVertColorLen == numVerts) {
-			wtcol_v = em->derivedVertColor;
-		}
-		else {
-			if (em->derivedVertColor) MEM_freeN(em->derivedVertColor);
-			wtcol_v = em->derivedVertColor = MEM_mallocN(sizeof(*wtcol_v) * numVerts, __func__);
-			em->derivedVertColorLen = numVerts;
-		}
+		BKE_editmesh_color_ensure(em, BM_VERT);
+		wtcol_v = em->derivedVertColor;
 	}
 	else {
 		wtcol_v = MEM_mallocN(sizeof(*wtcol_v) * numVerts, __func__);
@@ -1283,6 +1278,12 @@ void DM_update_weight_mcol(Object *ob, DerivedMesh *dm, int const draw_flag,
 	}
 }
 
+static void DM_update_statvis_color(Scene *scene, Object *ob, DerivedMesh *dm)
+{
+	BMEditMesh *em = BKE_editmesh_from_object(ob);
+
+	BKE_editmesh_statvis_calc(em, dm, &scene->toolsettings->statvis);
+}
 
 static void shapekey_layers_to_keyblocks(DerivedMesh *dm, Mesh *me, int actshape_uid)
 {
@@ -1939,6 +1940,7 @@ static void editbmesh_calc_modifiers(Scene *scene, Object *ob, BMEditMesh *em, D
 #endif
 	const int do_final_wmcol = FALSE;
 	int do_init_wmcol = ((((Mesh *)ob->data)->drawflag & ME_DRAWEIGHT) && !do_final_wmcol);
+	int do_init_statvis = ((((Mesh *)ob->data)->drawflag & ME_DRAW_STATVIS) && !do_init_wmcol);
 
 	modifiers_clearErrors(ob);
 
@@ -2127,6 +2129,8 @@ static void editbmesh_calc_modifiers(Scene *scene, Object *ob, BMEditMesh *em, D
 		/* In this case, we should never have weight-modifying modifiers in stack... */
 		if (do_init_wmcol)
 			DM_update_weight_mcol(ob, *final_r, draw_flag, NULL, 0, NULL);
+		if (do_init_statvis)
+			DM_update_statvis_color(scene, ob, *final_r);
 	}
 	else {
 		/* this is just a copy of the editmesh, no need to calc normals */
@@ -2136,6 +2140,8 @@ static void editbmesh_calc_modifiers(Scene *scene, Object *ob, BMEditMesh *em, D
 		/* In this case, we should never have weight-modifying modifiers in stack... */
 		if (do_init_wmcol)
 			DM_update_weight_mcol(ob, *final_r, draw_flag, NULL, 0, NULL);
+		if (do_init_statvis)
+			DM_update_statvis_color(scene, ob, *final_r);
 	}
 
 	/* --- */
