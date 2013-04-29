@@ -1231,6 +1231,7 @@ class VIEW3D_MT_paint_vertex(Menu):
         layout.separator()
 
         layout.operator("paint.vertex_color_set")
+        layout.operator("paint.vertex_color_smooth")
         layout.operator("paint.vertex_color_dirt")
 
 
@@ -1927,7 +1928,7 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
 
         layout.separator()
 
-        layout.operator("mesh.bevel")
+        layout.operator("mesh.bevel").vertex_only = False
         layout.operator("mesh.edge_split")
         layout.operator("mesh.bridge_edge_loops")
         layout.operator("mesh.sort_elements", text="Sort Edges").elements = {'EDGE'}
@@ -1956,7 +1957,7 @@ class VIEW3D_MT_edit_mesh_faces(Menu):
         layout.operator("mesh.fill")
         layout.operator("mesh.beautify_fill")
         layout.operator("mesh.inset")
-        layout.operator("mesh.bevel")
+        layout.operator("mesh.bevel").vertex_only = False
         layout.operator("mesh.solidify")
         layout.operator("mesh.wireframe")
         layout.operator("mesh.sort_elements", text="Sort Faces").elements = {'FACE'}
@@ -2392,6 +2393,7 @@ class VIEW3D_PT_view3d_properties(Panel):
 
         col = layout.column(align=True)
         col.prop(view, "use_render_border")
+        col.active = view.region_3d.view_perspective != 'CAMERA'
 
 
 class VIEW3D_PT_view3d_cursor(Panel):

@@ -63,7 +63,7 @@ def texture_node_group_items(self):
 
 # All standard node categories currently used in nodes.
 
-std_node_categories = [
+shader_node_categories = [
     # Shader Nodes
     ShaderOldNodeCategory("SH_INPUT", "Input", items=[
         NodeItem("ShaderNodeMaterial"),
@@ -101,6 +101,7 @@ std_node_categories = [
         ]),
     ShaderOldNodeCategory("SH_GROUP", "Group", items=shader_node_group_items),
     ShaderOldNodeCategory("SH_LAYOUT", "Layout", items=[
+        NodeItem("NodeFrame"),
         ]),
 
     # New Shader Nodes (Cycles)
@@ -183,8 +184,11 @@ std_node_categories = [
         ]),
     ShaderNewNodeCategory("SH_NEW_GROUP", "Group", items=shader_node_group_items),
     ShaderNewNodeCategory("SH_NEW_LAYOUT", "Layout", items=[
+        NodeItem("NodeFrame"),
         ]),
+    ]
 
+compositor_node_categories = [
      # Compositor Nodes
      CompositorNodeCategory("CMP_INPUT", "Input", items = [
         NodeItem("CompositorNodeRLayers"),
@@ -285,9 +289,12 @@ std_node_categories = [
         ]),
     CompositorNodeCategory("CMP_GROUP", "Group", items=compositor_node_group_items),
     CompositorNodeCategory("CMP_LAYOUT", "Layout", items = [
+        NodeItem("NodeFrame"),
         NodeItem("CompositorNodeSwitch"),
         ]),
+    ]
 
+texture_node_categories = [
     # Texture Nodes
     TextureNodeCategory("TEX_INPUT", "Input", items = [
         NodeItem("TextureNodeCurveTime"),
@@ -337,19 +344,21 @@ std_node_categories = [
         ]),
     TextureNodeCategory("TEX_GROUP", "Group", items=texture_node_group_items),
     TextureNodeCategory("TEX_LAYOUT", "Layout", items = [
+        NodeItem("NodeFrame"),
         ]),
     ]
 
 
 def register():
-    # XXX can be made a lot nicer, just get it working for now
-    nodeitems_utils.node_categories = std_node_categories
-    nodeitems_utils.register_node_ui()
+    nodeitems_utils.register_node_categories("SHADER", shader_node_categories)
+    nodeitems_utils.register_node_categories("COMPOSITING", compositor_node_categories)
+    nodeitems_utils.register_node_categories("TEXTURE", texture_node_categories)
 
 
 def unregister():
-    nodeitems_utils.unregister_node_ui()
-    nodeitems_utils.node_categories = []
+    nodeitems_utils.unregister_node_categories("SHADER")
+    nodeitems_utils.unregister_node_categories("COMPOSITING")
+    nodeitems_utils.unregister_node_categories("TEXTURE")
 
 
 if __name__ == "__main__":

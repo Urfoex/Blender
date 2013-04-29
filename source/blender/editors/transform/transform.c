@@ -908,12 +908,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_TRANSLATE:
 				/* only switch when... */
 				if (ELEM5(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
-					if (t->mode == TFM_EDGE_SLIDE) {
-						freeEdgeSlideVerts(t);
-					}
-					else if (t->mode == TFM_VERT_SLIDE) {
-						freeVertSlideVerts(t);
-					}
+					resetTransModal(t);
 					resetTransRestrictions(t);
 					restoreTransObjects(t);
 					initTranslation(t);
@@ -928,6 +923,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				else {
 					if (t->obedit && t->obedit->type == OB_MESH) {
 						if ((t->mode == TFM_TRANSLATION) && (t->spacetype == SPACE_VIEW3D)) {
+							resetTransModal(t);
 							resetTransRestrictions(t);
 							restoreTransObjects(t);
 
@@ -963,8 +959,8 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_ROTATE:
 				/* only switch when... */
 				if (!(t->options & CTX_TEXTURE) && !(t->options & (CTX_MOVIECLIP | CTX_MASK))) {
-					if (ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
-						
+					if (ELEM6(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
+						resetTransModal(t);
 						resetTransRestrictions(t);
 						
 						if (t->mode == TFM_ROTATION) {
@@ -982,7 +978,8 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 			case TFM_MODAL_RESIZE:
 				/* only switch when... */
-				if (ELEM3(t->mode, TFM_ROTATION, TFM_TRANSLATION, TFM_TRACKBALL) ) {
+				if (ELEM5(t->mode, TFM_ROTATION, TFM_TRANSLATION, TFM_TRACKBALL, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
+					resetTransModal(t);
 					resetTransRestrictions(t);
 					restoreTransObjects(t);
 					initResize(t);
@@ -1227,6 +1224,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case GKEY:
 				/* only switch when... */
 				if (ELEM3(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL) ) {
+					resetTransModal(t);
 					resetTransRestrictions(t);
 					restoreTransObjects(t);
 					initTranslation(t);
@@ -1237,6 +1235,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case SKEY:
 				/* only switch when... */
 				if (ELEM3(t->mode, TFM_ROTATION, TFM_TRANSLATION, TFM_TRACKBALL) ) {
+					resetTransModal(t);
 					resetTransRestrictions(t);
 					restoreTransObjects(t);
 					initResize(t);
@@ -1248,7 +1247,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				/* only switch when... */
 				if (!(t->options & CTX_TEXTURE)) {
 					if (ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
-
+						resetTransModal(t);
 						resetTransRestrictions(t);
 
 						if (t->mode == TFM_ROTATION) {
@@ -1941,17 +1940,20 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *even
 		return 0;
 	}
 
-	/* Stupid code to have Ctrl-Click on manipulator work ok */
 	if (event) {
-		/* do this only for translation/rotation/resize due to only this
+		/* keymap for shortcut header prints */
+		t->keymap = WM_keymap_active(CTX_wm_manager(C), op->type->modalkeymap);
+
+		/* Stupid code to have Ctrl-Click on manipulator work ok
+		 *
+		 * do this only for translation/rotation/resize due to only this
 		 * moded are available from manipulator and doing such check could
 		 * lead to keymap conflicts for other modes (see #31584)
 		 */
 		if (ELEM3(mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE)) {
-			wmKeyMap *keymap = WM_keymap_active(CTX_wm_manager(C), op->type->modalkeymap);
 			wmKeyMapItem *kmi;
 
-			for (kmi = keymap->items.first; kmi; kmi = kmi->next) {
+			for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
 				if (kmi->propvalue == TFM_MODAL_SNAP_INV_ON && kmi->val == KM_PRESS) {
 					if ((ELEM(kmi->type, LEFTCTRLKEY, RIGHTCTRLKEY) &&   event->ctrl)  ||
 					    (ELEM(kmi->type, LEFTSHIFTKEY, RIGHTSHIFTKEY) && event->shift) ||
@@ -1964,10 +1966,7 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *even
 				}
 			}
 		}
-
 	}
-
-	t->keymap = WM_keymap_active(CTX_wm_manager(C), op->type->modalkeymap);
 
 	initSnapping(t, op); // Initialize snapping data AFTER mode flags
 
@@ -4134,7 +4133,7 @@ int ShrinkFatten(TransInfo *t, const int UNUSED(mval[2]))
 	}
 	ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, ", (");
 
-	{
+	if (t->keymap) {
 		wmKeyMapItem *kmi = WM_modalkeymap_find_propvalue(t->keymap, TFM_MODAL_RESIZE);
 		if (kmi) {
 			ofs += WM_keymap_item_to_string(kmi, str + ofs, MAX_INFO_LEN - ofs);
@@ -5597,7 +5596,6 @@ void projectEdgeSlideData(TransInfo *t, bool is_final)
 	EdgeSlideData *sld = t->customData;
 	TransDataEdgeSlideVert *sv;
 	BMEditMesh *em = sld->em;
-	SmallHash visit;
 	int i;
 
 	if (!em)
@@ -5610,142 +5608,155 @@ void projectEdgeSlideData(TransInfo *t, bool is_final)
 	 * accidentally break uv maps or vertex colors then */
 	if (em->bm->shapenr > 1)
 		return;
-
-	BLI_smallhash_init(&visit);
 	
 	for (i = 0, sv = sld->sv; i < sld->totsv; sv++, i++) {
 		BMIter fiter;
-		BMFace *f;
+		BMLoop *l;
 
-		/* BMESH_TODO, this interpolates between vertex/loops which are not moved
-		 * (are only apart of a face attached to a slide vert), couldn't we iterate BM_LOOPS_OF_VERT
-		 * here and only interpolate those? */
-		BM_ITER_ELEM (f, &fiter, sv->v, BM_FACES_OF_VERT) {
-			BMIter liter;
-			BMLoop *l;
-
+		BM_ITER_ELEM (l, &fiter, sv->v, BM_LOOPS_OF_VERT) {
 			BMFace *f_copy;      /* the copy of 'f' */
 			BMFace *f_copy_flip; /* the copy of 'f' or detect if we need to flip to the shorter side. */
-
-			char is_sel, is_hide;
-
-			
-			if (BLI_smallhash_haskey(&visit, (uintptr_t)f))
-				continue;
-			
-			BLI_smallhash_insert(&visit, (uintptr_t)f, NULL);
+			bool is_sel, is_hide;
 			
 			/* the face attributes of the copied face will get
 			 * copied over, so its necessary to save the selection
 			 * and hidden state*/
-			is_sel = BM_elem_flag_test(f, BM_ELEM_SELECT);
-			is_hide = BM_elem_flag_test(f, BM_ELEM_HIDDEN);
+			is_sel = BM_elem_flag_test(l->f, BM_ELEM_SELECT) != 0;
+			is_hide = BM_elem_flag_test(l->f, BM_ELEM_HIDDEN) != 0;
 			
-			f_copy = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)f);
+			f_copy = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l->f);
 			
 			/* project onto copied projection face */
-			BM_ITER_ELEM (l, &liter, f, BM_LOOPS_OF_FACE) {
-				/* only affected verts will get interpolated */
-				bool affected = false;
-				f_copy_flip = f_copy;
+			f_copy_flip = f_copy;
 
-				if (BM_elem_flag_test(l->e, BM_ELEM_SELECT) || BM_elem_flag_test(l->prev->e, BM_ELEM_SELECT)) {
-					/* the loop is attached of the selected edges that are sliding */
-					BMLoop *l_ed_sel = l;
-					
-					if (!BM_elem_flag_test(l->e, BM_ELEM_SELECT))
-						l_ed_sel = l_ed_sel->prev;
-					
+			if (BM_elem_flag_test(l->e, BM_ELEM_SELECT) || BM_elem_flag_test(l->prev->e, BM_ELEM_SELECT)) {
+				/* the loop is attached of the selected edges that are sliding */
+				BMLoop *l_ed_sel = l;
+
+				if (!BM_elem_flag_test(l->e, BM_ELEM_SELECT))
+					l_ed_sel = l_ed_sel->prev;
+
+				if (sld->perc < 0.0f) {
+					if (BM_vert_in_face(l_ed_sel->radial_next->f, sv->v_b)) {
+						f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l_ed_sel->radial_next->f);
+					}
+				}
+				else if (sld->perc > 0.0f) {
+					if (BM_vert_in_face(l_ed_sel->radial_next->f, sv->v_a)) {
+						f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l_ed_sel->radial_next->f);
+					}
+				}
+
+				BLI_assert(f_copy_flip != NULL);
+				if (!f_copy_flip) {
+					continue;  /* shouldn't happen, but protection */
+				}
+			}
+			else {
+				/* the loop is attached to only one vertex and not a selected edge,
+				 * this means we have to find a selected edges face going in the right direction
+				 * to copy from else we get bad distortion see: [#31080] */
+				BMIter eiter;
+				BMEdge *e_sel;
+
+				BLI_assert(l->v == sv->v);
+				BM_ITER_ELEM (e_sel, &eiter, sv->v, BM_EDGES_OF_VERT) {
+					if (BM_elem_flag_test(e_sel, BM_ELEM_SELECT)) {
+						break;
+					}
+				}
+
+				if (e_sel) {
+					/* warning if the UV's are not contiguous, this will copy from the _wrong_ UVs
+					 * in fact whenever the face being copied is not 'f_copy' this can happen,
+					 * we could be a lot smarter about this but would need to deal with every UV channel or
+					 * add a way to mask out lauers when calling #BM_loop_interp_from_face() */
+
+					/*
+					 *        +    +----------------+
+					 *         \   |                |
+					 * (this) l_adj|                |
+					 *           \ |                |
+					 *            \|      e_sel     |
+					 *  +----------+----------------+  <- the edge we are sliding.
+					 *            /|sv->v           |
+					 *           / |                |
+					 *   (or) l_adj|                |
+					 *         /   |                |
+					 *        +    +----------------+
+					 * (above)
+					 * 'other connected loops', attached to sv->v slide faces.
+					 *
+					 * NOTE: The faces connected to the edge may not have contiguous UV's
+					 *       so step around the loops to find l_adj.
+					 *       However if the 'other loops' are not cotiguous it will still give problems.
+					 *
+					 *       A full solution to this would have to store
+					 *       per-customdata-layer map of which loops are contiguous
+					 *       and take this into account when interpolating.
+					 *
+					 * NOTE: If l_adj's edge isnt manifold then use then
+					 *       interpolate the loop from its own face.
+					 *       Can happen when 'other connected loops' are disconnected from the face-fan.
+					 */
+
+					BMLoop *l_adj = NULL;
 					if (sld->perc < 0.0f) {
-						if (BM_vert_in_face(l_ed_sel->radial_next->f, sv->v_b)) {
-							f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l_ed_sel->radial_next->f);
+						if (BM_vert_in_face(e_sel->l->f, sv->v_b)) {
+							l_adj = e_sel->l;
+						}
+						else if (BM_vert_in_face(e_sel->l->radial_next->f, sv->v_b)) {
+							l_adj = e_sel->l->radial_next;
 						}
 					}
 					else if (sld->perc > 0.0f) {
-						if (BM_vert_in_face(l_ed_sel->radial_next->f, sv->v_a)) {
-							f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l_ed_sel->radial_next->f);
+						if (BM_vert_in_face(e_sel->l->f, sv->v_a)) {
+							l_adj = e_sel->l;
+						}
+						else if (BM_vert_in_face(e_sel->l->radial_next->f, sv->v_a)) {
+							l_adj = e_sel->l->radial_next;
 						}
 					}
 
-					BLI_assert(f_copy_flip != NULL);
-					if (!f_copy_flip) {
-						continue;  /* shouldn't happen, but protection */
-					}
+					/* step across to the face */
+					if (l_adj) {
+						l_adj = BM_loop_other_edge_loop(l_adj, sv->v);
+						if (!BM_edge_is_boundary(l_adj->e)) {
+							l_adj = l_adj->radial_next;
+						}
+						else {
+							/* disconnected face-fan, fallback to self */
+							l_adj = l;
+						}
 
-					affected = true;
+						f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)l_adj->f);
+					}
 				}
-				else {
-					/* the loop is attached to only one vertex and not a selected edge,
-					 * this means we have to find a selected edges face going in the right direction
-					 * to copy from else we get bad distortion see: [#31080] */
-					BMIter eiter;
-					BMEdge *e_sel;
+			}
 
-					BM_ITER_ELEM (e_sel, &eiter, l->v, BM_EDGES_OF_VERT) {
-						if (BM_elem_flag_test(e_sel, BM_ELEM_SELECT)) {
-							break;
-						}
-					}
+			/* only loop data, no vertex data since that contains shape keys,
+			 * and we do not want to mess up other shape keys */
+			BM_loop_interp_from_face(em->bm, l, f_copy_flip, false, false);
 
-					if (e_sel) {
-						/* warning if the UV's are not contiguous, this will copy from the _wrong_ UVs
-						 * in fact whenever the face being copied is not 'f_copy' this can happen,
-						 * we could be a lot smarter about this but would need to deal with every UV channel or
-						 * add a way to mask out lauers when calling #BM_loop_interp_from_face() */
-						if (sld->perc < 0.0f) {
-							if (BM_vert_in_face(e_sel->l->f, sv->v_b)) {
-								f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)e_sel->l->f);
-							}
-							else if (BM_vert_in_face(e_sel->l->radial_next->f, sv->v_b)) {
-								f_copy_flip = BLI_smallhash_lookup(&sld->origfaces,
-								                                   (uintptr_t)e_sel->l->radial_next->f);
-							}
-
-						}
-						else if (sld->perc > 0.0f) {
-							if (BM_vert_in_face(e_sel->l->f, sv->v_a)) {
-								f_copy_flip = BLI_smallhash_lookup(&sld->origfaces, (uintptr_t)e_sel->l->f);
-							}
-							else if (BM_vert_in_face(e_sel->l->radial_next->f, sv->v_a)) {
-								f_copy_flip = BLI_smallhash_lookup(&sld->origfaces,
-								                                   (uintptr_t)e_sel->l->radial_next->f);
-							}
-						}
-
-						affected = true;
-					}
-
-				}
-
-				if (affected == false)
-					continue;
-
-				/* only loop data, no vertex data since that contains shape keys,
-				 * and we do not want to mess up other shape keys */
-				BM_loop_interp_from_face(em->bm, l, f_copy_flip, false, false);
-
-				if (is_final) {
-					BM_loop_interp_multires(em->bm, l, f_copy_flip);
-					if (f_copy != f_copy_flip) {
-						BM_loop_interp_multires(em->bm, l, f_copy);
-					}
+			if (is_final) {
+				BM_loop_interp_multires(em->bm, l, f_copy_flip);
+				if (f_copy != f_copy_flip) {
+					BM_loop_interp_multires(em->bm, l, f_copy);
 				}
 			}
 			
 			/* make sure face-attributes are correct (e.g. MTexPoly) */
-			BM_elem_attrs_copy(em->bm, em->bm, f_copy, f);
+			BM_elem_attrs_copy(em->bm, em->bm, f_copy, l->f);
 			
 			/* restore selection and hidden flags */
-			BM_face_select_set(em->bm, f, is_sel);
+			BM_face_select_set(em->bm, l->f, is_sel);
 			if (!is_hide) {
 				/* this check is a workaround for bug, see note - [#30735],
 				 * without this edge can be hidden and selected */
-				BM_elem_hide_set(em->bm, f, is_hide);
+				BM_elem_hide_set(em->bm, l->f, is_hide);
 			}
 		}
 	}
-
-	BLI_smallhash_release(&visit);
 }
 
 void freeEdgeSlideTempFaces(EdgeSlideData *sld)
@@ -6004,7 +6015,7 @@ static int doEdgeSlide(TransInfo *t, float perc)
 			if (sv->edge_len > FLT_EPSILON) {
 				const float fac = min_ff(sv->edge_len, curr_length_perc) / sv->edge_len;
 
-				add_v3_v3v3(co_a, sv->dir_b, sv->dir_a);
+				add_v3_v3v3(co_a, sv->v_co_orig, sv->dir_a);
 				add_v3_v3v3(co_b, sv->v_co_orig, sv->dir_b);
 
 				if (sld->flipped_vtx) {
@@ -6428,7 +6439,7 @@ static void drawVertSlide(const struct bContext *C, TransInfo *t)
 			TransDataVertSlideVert *sv;
 			const float ctrl_size = UI_GetThemeValuef(TH_FACEDOT_SIZE) + 1.5f;
 			const float line_size = UI_GetThemeValuef(TH_OUTLINE_WIDTH) + 0.5f;
-			const int alpha_shade = -30;
+			const int alpha_shade = -160;
 			const bool is_clamp = !(t->flag & T_ALT_TRANSFORM);
 			int i;
 
@@ -6900,7 +6911,7 @@ static void headerSeqSlide(TransInfo *t, float val[2], char *str)
 
 	ofs += BLI_snprintf(str + ofs, MAX_INFO_LEN - ofs, IFACE_("Sequence Slide: %s%s, ("), &tvec[0], t->con.text);
 
-	{
+	if (t->keymap) {
 		wmKeyMapItem *kmi = WM_modalkeymap_find_propvalue(t->keymap, TFM_MODAL_TRANSLATE);
 		if (kmi) {
 			ofs += WM_keymap_item_to_string(kmi, str + ofs, MAX_INFO_LEN - ofs);
@@ -6910,7 +6921,7 @@ static void headerSeqSlide(TransInfo *t, float val[2], char *str)
 	                    (t->flag & T_ALT_TRANSFORM) ? IFACE_("ON") : IFACE_("OFF"));
 }
 
-static void applySeqSlide(TransInfo *t, float val[2])
+static void applySeqSlide(TransInfo *t, const float val[2])
 {
 	TransData *td = t->data;
 	int i;
