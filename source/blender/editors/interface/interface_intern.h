@@ -475,10 +475,11 @@ void ui_popup_block_scrolltest(struct uiBlock *block);
 /* searchbox for string button */
 ARegion *ui_searchbox_create(struct bContext *C, struct ARegion *butregion, uiBut *but);
 bool ui_searchbox_inside(struct ARegion *ar, int x, int y);
+int  ui_searchbox_find_index(struct ARegion *ar, const char *name);
 void ui_searchbox_update(struct bContext *C, struct ARegion *ar, uiBut *but, const bool reset);
 void ui_searchbox_autocomplete(struct bContext *C, struct ARegion *ar, uiBut *but, char *str);
 void ui_searchbox_event(struct bContext *C, struct ARegion *ar, uiBut *but, const struct wmEvent *event);
-void ui_searchbox_apply(uiBut *but, struct ARegion *ar);
+bool ui_searchbox_apply(uiBut *but, struct ARegion *ar);
 void ui_searchbox_free(struct bContext *C, struct ARegion *ar);
 void ui_but_search_test(uiBut *but);
 
@@ -543,7 +544,7 @@ void ui_widget_color_init(struct ThemeUI *tui);
 void ui_draw_menu_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
 void ui_draw_preview_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
 
-extern unsigned char checker_stipple_sml[32 * 32 / 8];
+extern const unsigned char checker_stipple_sml[32 * 32 / 8];
 /* used for transp checkers */
 #define UI_TRANSP_DARK 100
 #define UI_TRANSP_LIGHT 160

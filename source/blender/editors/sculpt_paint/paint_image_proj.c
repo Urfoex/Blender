@@ -290,8 +290,8 @@ typedef struct ProjPixel {
 	/* Only used when the airbrush is disabled.
 	 * Store the max mask value to avoid painting over an area with a lower opacity
 	 * with an advantage that we can avoid touching the pixel at all, if the
-	 * new mask value is lower then mask_max */
-	unsigned short mask_max;
+	 * new mask value is lower then mask_accum */
+	unsigned short mask_accum;
 
 	/* for various reasons we may want to mask out painting onto this pixel */
 	unsigned short mask;
@@ -1343,7 +1343,7 @@ static ProjPixel *project_paint_uvpixel_init(
 	projPixel->y_px = y_px;
 
 	projPixel->mask = (unsigned short)(mask * 65535);
-	projPixel->mask_max = 0;
+	projPixel->mask_accum = 0;
 
 	/* which bounding box cell are we in?, needed for undo */
 	projPixel->bb_cell_index = ((int)(((float)x_px / (float)ibuf->x) * PROJ_BOUNDBOX_DIV)) +
@@ -3516,34 +3516,6 @@ typedef struct ProjectHandle {
 	struct ImagePool *pool;
 } ProjectHandle;
 
-static void interpolate_color_byte(unsigned char dst[4], const unsigned char src1[4], const unsigned char src2[4], const float ffac)
-{
-	/* do color interpolation, but in premultiplied space so that RGB colors
-	 * from zero alpha regions have no influence */
-	const int fac = (int)(255 * ffac);
-	const int mfac = 255 - fac;
-	int tmp = (mfac * src1[3] + fac * src2[3]);
-
-	if (tmp > 0) {
-		dst[0] = divide_round_i(mfac * src1[0] * src1[3] + fac * src2[0] * src2[3], tmp);
-		dst[1] = divide_round_i(mfac * src1[1] * src1[3] + fac * src2[1] * src2[3], tmp);
-		dst[2] = divide_round_i(mfac * src1[2] * src1[3] + fac * src2[2] * src2[3], tmp);
-		dst[3] = divide_round_i(tmp, 255);
-	}
-	else {
-		dst[0] = src1[0];
-		dst[1] = src1[1];
-		dst[2] = src1[2];
-		dst[3] = src1[3];
-	}
-}
-
-static void interpolate_color_float(float dst[4], const float src1[4], const float src2[4], const float fac)
-{
-	/* interpolation, colors are premultiplied so it goes fine */
-	interp_v4_v4v4(dst, src1, src2, fac);
-}
-
 static void do_projectpaint_clone(ProjPaintState *ps, ProjPixel *projPixel, float mask)
 {
 	const unsigned char *clone_pt = ((ProjPixelClone *)projPixel)->clonepx.ch;
@@ -3597,7 +3569,7 @@ static void do_projectpaint_smear(ProjPaintState *ps, ProjPixel *projPixel, floa
 	if (project_paint_PickColor(ps, co, NULL, rgba_ub, 1) == 0)
 		return;
 
-	interpolate_color_byte(((ProjPixelClone *)projPixel)->clonepx.ch, projPixel->pixel.ch_pt, rgba_ub, mask);
+	blend_color_interpolate_byte(((ProjPixelClone *)projPixel)->clonepx.ch, projPixel->pixel.ch_pt, rgba_ub, mask);
 	BLI_linklist_prepend_arena(smearPixels, (void *)projPixel, smearArena);
 }
 
@@ -3609,7 +3581,7 @@ static void do_projectpaint_smear_f(ProjPaintState *ps, ProjPixel *projPixel, fl
 	if (project_paint_PickColor(ps, co, rgba, NULL, 1) == 0)
 		return;
 
-	interpolate_color_float(((ProjPixelClone *)projPixel)->clonepx.f, projPixel->pixel.f_pt, rgba, mask);
+	blend_color_interpolate_float(((ProjPixelClone *)projPixel)->clonepx.f, projPixel->pixel.f_pt, rgba, mask);
 	BLI_linklist_prepend_arena(smearPixels_f, (void *)projPixel, smearArena);
 }
 
@@ -3648,7 +3620,7 @@ static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, f
 
 	if (LIKELY(accum_tot != 0)) {
 		mul_v4_fl(rgba, 1.0f / (float)accum_tot);
-		interpolate_color_float(rgba, rgba, projPixel->pixel.f_pt, mask);
+		blend_color_interpolate_float(rgba, rgba, projPixel->pixel.f_pt, mask);
 		BLI_linklist_prepend_arena(softenPixels, (void *)projPixel, softenArena);
 	}
 }
@@ -3683,7 +3655,7 @@ static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, flo
 		mul_v4_fl(rgba, 1.0f / (float)accum_tot);
 		premul_float_to_straight_uchar(rgba_ub, rgba);
 
-		interpolate_color_byte(rgba_ub, rgba_ub, projPixel->pixel.ch_pt, mask);
+		blend_color_interpolate_byte(rgba_ub, rgba_ub, projPixel->pixel.ch_pt, mask);
 		BLI_linklist_prepend_arena(softenPixels, (void *)projPixel, softenArena);
 	}
 }
@@ -3763,8 +3735,9 @@ static void *do_projectpaint_thread(void *ph_v)
 	float pos_ofs[2] = {0};
 	float co[2];
 	unsigned short mask_short;
-	const float radius = (float)BKE_brush_size_get(ps->scene, brush);
-	const float radius_squared = radius * radius; /* avoid a square root with every dist comparison */
+	const float brush_alpha = BKE_brush_alpha_get(ps->scene, brush);
+	const float brush_radius = (float)BKE_brush_size_get(ps->scene, brush);
+	const float brush_radius_sq = brush_radius * brush_radius; /* avoid a square root with every dist comparison */
 
 	short lock_alpha = ELEM(brush->blend, IMB_BLEND_ERASE_ALPHA, IMB_BLEND_ADD_ALPHA) ? 0 : brush->flag & BRUSH_LOCK_ALPHA;
 
@@ -3852,30 +3825,52 @@ static void *do_projectpaint_thread(void *ph_v)
 				dist_nosqrt = len_squared_v2v2(projPixel->projCoSS, pos);
 
 				/*if (dist < radius) {*/ /* correct but uses a sqrtf */
-				if (dist_nosqrt <= radius_squared) {
-					float samplecos[3];
+				if (dist_nosqrt <= brush_radius_sq) {
 					dist = sqrtf(dist_nosqrt);
 
-					falloff = BKE_brush_curve_strength_clamp(ps->brush, dist, radius);
-
-					if (ps->is_texbrush) {
-						MTex *mtex = &brush->mtex;
-						/* taking 3d copy to account for 3D mapping too. It gets concatenated during sampling */
-						if (mtex->brush_map_mode == MTEX_MAP_MODE_3D) {
-							copy_v3_v3(samplecos, projPixel->worldCoSS);
-						}
-						else {
-							copy_v2_v2(samplecos, projPixel->projCoSS);
-							samplecos[2] = 0.0f;
-						}
-					}
+					falloff = BKE_brush_curve_strength_clamp(ps->brush, dist, brush_radius);
 
 					if (falloff > 0.0f) {
 						float texrgb[3];
-						float mask = falloff * BKE_brush_alpha_get(ps->scene, brush);
+						float mask = falloff;
+
+						if (ps->do_masking) {
+							/* masking to keep brush contribution to a pixel limited. note we do not do
+							 * a simple max(mask, mask_accum), as this is very sensitive to spacing and
+							 * gives poor results for strokes crossing themselves.
+							 * 
+							 * Instead we use a formula that adds up but approaches brush_alpha slowly
+							 * and never exceeds it, which gives nice smooth results. */
+							float mask_accum = projPixel->mask_accum;
+
+							mask = mask_accum + (brush_alpha * 65535.0f - mask_accum) * mask;
+							mask_short = (unsigned short)mask;
+
+							if (mask_short > projPixel->mask_accum) {
+								projPixel->mask_accum = mask_short;
+								mask = mask_short * (1.0f / 65535.0f);
+							}
+							else {
+								/* Go onto the next pixel */
+								continue;
+							}
+						}
+						else
+							mask *= brush_alpha;
 
 						if (ps->is_texbrush) {
+							MTex *mtex = &brush->mtex;
+							float samplecos[3];
 							float texrgba[4];
+
+							/* taking 3d copy to account for 3D mapping too. It gets concatenated during sampling */
+							if (mtex->brush_map_mode == MTEX_MAP_MODE_3D) {
+								copy_v3_v3(samplecos, projPixel->worldCoSS);
+							}
+							else {
+								copy_v2_v2(samplecos, projPixel->projCoSS);
+								samplecos[2] = 0.0f;
+							}
 
 							/* note, for clone and smear, we only use the alpha, could be a special function */
 							BKE_brush_sample_tex_3D(ps->scene, brush, samplecos, texrgba, thread_index, pool);
@@ -3888,22 +3883,8 @@ static void *do_projectpaint_thread(void *ph_v)
 							mask *= BKE_brush_sample_masktex(ps->scene, ps->brush, projPixel->projCoSS, thread_index, pool);
 						}
 
-						if (!ps->do_masking) {
-							/* for an aurbrush there is no real mask, so just multiply the alpha by it */
-							mask *= ((float)projPixel->mask) * (1.0f / 65535.0f);
-						}
-						else {
-							mask_short = (unsigned short)(projPixel->mask * mask);
-
-							if (mask_short > projPixel->mask_max) {
-								mask = ((float)mask_short) * (1.0f / 65535.0f);
-								projPixel->mask_max = mask_short;
-							}
-							else {
-								/* Go onto the next pixel */
-								continue;
-							}
-						}
+						/* extra mask for normal, layer stencil, .. */
+						mask *= ((float)projPixel->mask) * (1.0f / 65535.0f);
 
 						if (mask > 0.0f) {
 
@@ -3928,21 +3909,21 @@ static void *do_projectpaint_thread(void *ph_v)
 							switch (tool) {
 								case PAINT_TOOL_CLONE:
 									if (is_floatbuf) do_projectpaint_clone_f(ps, projPixel, mask);
-									else do_projectpaint_clone(ps, projPixel, mask);
+									else             do_projectpaint_clone(ps, projPixel, mask);
 									break;
 								case PAINT_TOOL_SMEAR:
 									sub_v2_v2v2(co, projPixel->projCoSS, pos_ofs);
 
 									if (is_floatbuf) do_projectpaint_smear_f(ps, projPixel, mask, smearArena, &smearPixels_f, co);
-									else do_projectpaint_smear(ps, projPixel, mask, smearArena, &smearPixels, co);
+									else             do_projectpaint_smear(ps, projPixel, mask, smearArena, &smearPixels, co);
 									break;
 								case PAINT_TOOL_SOFTEN:
 									if (is_floatbuf) do_projectpaint_soften_f(ps, projPixel, mask, softenArena, &softenPixels_f);
-									else do_projectpaint_soften(ps, projPixel, mask, softenArena, &softenPixels);
+									else             do_projectpaint_soften(ps, projPixel, mask, softenArena, &softenPixels);
 									break;
 								default:
 									if (is_floatbuf) do_projectpaint_draw_f(ps, projPixel, texrgb, mask);
-									else do_projectpaint_draw(ps, projPixel, texrgb, mask);
+									else             do_projectpaint_draw(ps, projPixel, texrgb, mask);
 									break;
 							}
 						}
@@ -4122,8 +4103,9 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps, int 
 		ps->blend = brush->blend;
 
 		/* disable for 3d mapping also because painting on mirrored mesh can create "stripes" */
-		ps->do_masking = (brush->flag & BRUSH_AIRBRUSH || (brush->mtex.tex &&
-		                 !ELEM(brush->mtex.brush_map_mode, MTEX_MAP_MODE_TILED, MTEX_MAP_MODE_STENCIL)))
+		ps->do_masking = (brush->flag & BRUSH_AIRBRUSH ||
+		                  (brush->imagepaint_tool == PAINT_TOOL_SMEAR) ||
+		                  (brush->mtex.tex && !ELEM3(brush->mtex.brush_map_mode, MTEX_MAP_MODE_TILED, MTEX_MAP_MODE_STENCIL, MTEX_MAP_MODE_3D)))
 		                 ? false : true;
 		ps->is_texbrush = (brush->mtex.tex && brush->imagepaint_tool == PAINT_TOOL_DRAW) ? true : false;
 		ps->is_maskbrush = (brush->mask_mtex.tex) ? true : false;
