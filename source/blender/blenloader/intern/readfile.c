@@ -2526,9 +2526,11 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 							link->fromsock = node_group_input_find_socket(input_node, link->fromsock->identifier);
 							++num_inputs;
 							
-							if (input_locx > link->tonode->locx - offsetx)
-								input_locx = link->tonode->locx - offsetx;
-							input_locy += link->tonode->locy;
+							if (link->tonode) {
+								if (input_locx > link->tonode->locx - offsetx)
+									input_locx = link->tonode->locx - offsetx;
+								input_locy += link->tonode->locy;
+							}
 						}
 						else
 							free_link = TRUE;
@@ -2540,9 +2542,11 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 							link->tosock = node_group_output_find_socket(output_node, link->tosock->identifier);
 							++num_outputs;
 							
-							if (output_locx < link->fromnode->locx + offsetx)
-								output_locx = link->fromnode->locx + offsetx;
-							output_locy += link->fromnode->locy;
+							if (link->fromnode) {
+								if (output_locx < link->fromnode->locx + offsetx)
+									output_locx = link->fromnode->locx + offsetx;
+								output_locy += link->fromnode->locy;
+							}
 						}
 						else
 							free_link = TRUE;
@@ -2579,7 +2583,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 	{
 		FOREACH_NODETREE(main, ntree, id) {
 			/* make an update call for the tree */
-			ntreeUpdateTree(ntree);
+			ntreeUpdateTree(main, ntree);
 		} FOREACH_NODETREE_END
 	}
 }
@@ -9346,7 +9350,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	}
 	
 	/* default values in Freestyle settings */
-	{
+	if (main->versionfile < 267) {
 		Scene *sce;
 		SceneRenderLayer *srl;
 		FreestyleLineStyle *linestyle;
@@ -9404,7 +9408,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
-	{
+	if (main->versionfile < 267) {
 		/* Initialize the active_viewer_key for compositing */
 		bScreen *screen;
 		Scene *scene;

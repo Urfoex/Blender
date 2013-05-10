@@ -971,7 +971,9 @@ void ui_theme_init_default(void)
 	rgba_char_args_set(btheme->tnode.syntaxv, 104, 106, 117, 255);  /* generator */
 	rgba_char_args_set(btheme->tnode.syntaxc, 105, 117, 110, 255);  /* group */
 	rgba_char_args_set(btheme->tnode.movie, 155, 155, 155, 160);  /* frame */
-	rgba_char_args_set(btheme->tnode.console_output, 190, 190, 80, 255);	/* group input/output */
+	rgba_char_args_set(btheme->tnode.syntaxs, 151, 116, 116, 255);  /* matte nodes */
+	rgba_char_args_set(btheme->tnode.syntaxd, 116, 151, 151, 255);  /* distort nodes */
+	rgba_char_args_set(btheme->tnode.console_output, 223, 202, 53, 255);  /* interface nodes */
 	btheme->tnode.noodle_curving = 5;
 
 	/* space logic */
@@ -1053,7 +1055,6 @@ void UI_ThemeColorShade(int colorid, int offset)
 	CLAMP(g, 0, 255);
 	b = offset + (int) cp[2];
 	CLAMP(b, 0, 255);
-	//glColor3ub(r, g, b);
 	glColor4ub(r, g, b, cp[3]);
 }
 void UI_ThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
