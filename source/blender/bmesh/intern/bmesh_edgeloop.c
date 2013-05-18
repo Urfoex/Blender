@@ -156,7 +156,7 @@ int BM_mesh_edgeloops_find(BMesh *bm, ListBase *r_eloops,
 			/* add both directions */
 			if (bm_loop_build(el_store, e->v1, e->v2,  1) &&
 			    bm_loop_build(el_store, e->v2, e->v1, -1) &&
-			    el_store->verts.first)
+			    el_store->len > 1)
 			{
 				BLI_addtail(r_eloops, el_store);
 				BM_elem_flag_disable(e, BM_ELEM_INTERNAL_TAG);
@@ -600,4 +600,25 @@ void BM_edgeloop_expand(BMesh *UNUSED(bm), BMEdgeLoopStore *el_store, int el_sto
 	}
 
 	BLI_assert(el_store->len == el_store_len);
+}
+
+bool BM_edgeloop_overlap_check(struct BMEdgeLoopStore *el_store_a, struct BMEdgeLoopStore *el_store_b)
+{
+	LinkData *node;
+
+	/* init */
+	for (node = el_store_a->verts.first; node; node = node->next) {
+		BM_elem_flag_disable((BMVert *)node->data, BM_ELEM_INTERNAL_TAG);
+	}
+	for (node = el_store_b->verts.first; node; node = node->next) {
+		BM_elem_flag_enable((BMVert *)node->data, BM_ELEM_INTERNAL_TAG);
+	}
+
+	/* check 'a' */
+	for (node = el_store_a->verts.first; node; node = node->next) {
+		if (BM_elem_flag_test((BMVert *)node->data, BM_ELEM_INTERNAL_TAG)) {
+			return true;
+		}
+	}
+	return false;
 }

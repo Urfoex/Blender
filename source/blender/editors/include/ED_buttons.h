@@ -15,24 +15,25 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Campbell Barton
+ * The Original Code is Copyright (C) 2013, Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BKE_OBJECT_DEFORM_H__
-#define __BKE_OBJECT_DEFORM_H__
-
-/** \file BKE_object_deform.h
- * \ingroup bke
- * \brief Functions for dealing with objects and deform verts,
- *        used by painting and tools.
+/** \file ED_buttons.h
+ *  \ingroup editors
  */
 
-struct Object;
+#ifndef __ED_BUTTONS_H__
+#define __ED_BUTTONS_H__
 
-bool *BKE_objdef_lock_flags_get(struct Object *ob, const int defbase_tot);
-bool *BKE_objdef_validmap_get(struct Object *ob, const int defbase_tot);
-bool *BKE_objdef_selected_get(struct Object *ob, int defbase_tot, int *r_dg_flags_sel_tot);
+#include "BLI_utildefines.h"
 
-#endif  /* __BKE_OBJECT_DEFORM_H__ */
+/* Used to check whether a given texture context is valid in current context. */
+bool ED_texture_context_check_world(const struct bContext *C);
+bool ED_texture_context_check_material(const struct bContext *C);
+bool ED_texture_context_check_lamp(const struct bContext *C);
+bool ED_texture_context_check_particles(const struct bContext *C);
+bool ED_texture_context_check_others(const struct bContext *C);
+
+#endif /*  __ED_BUTTONS_H__ */
