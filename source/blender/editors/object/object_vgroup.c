@@ -618,7 +618,7 @@ static bool ed_vgroup_transfer_weight(Object *ob_dst, Object *ob_src, bDeformGro
 
 	/* Prepare transformation matrix.*/
 	invert_m4_m4(ob_src->imat, ob_src->obmat);
-	mult_m4_m4m4(tmp_mat, ob_src->imat, ob_dst->obmat);
+	mul_m4_m4m4(tmp_mat, ob_src->imat, ob_dst->obmat);
 
 	/* Clear weights.*/
 	if (replace_mode == WT_REPLACE_ALL_WEIGHTS) {
@@ -2026,7 +2026,7 @@ static void vgroup_clean_subset(Object *ob, const bool *vgroup_validmap, const i
 				continue;
 			}
 
-			j = vgroup_tot;
+			j = dv->totweight;
 
 			while (j--) {
 
