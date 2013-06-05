@@ -1121,7 +1121,7 @@ static int edbm_do_smooth_vertex_exec(bContext *C, wmOperator *op)
 
 	/* mirror before smooth */
 	if (((Mesh *)obedit->data)->editflag & ME_EDIT_MIRROR_X) {
-		EDBM_verts_mirror_cache_begin(em, true);
+		EDBM_verts_mirror_cache_begin(em, false, true);
 	}
 
 	/* if there is a mirror modifier with clipping, flag the verts that
@@ -1212,7 +1212,7 @@ static int edbm_do_smooth_laplacian_vertex_exec(bContext *C, wmOperator *op)
 
 	/* mirror before smooth */
 	if (((Mesh *)obedit->data)->editflag & ME_EDIT_MIRROR_X) {
-		EDBM_verts_mirror_cache_begin(em, true);
+		EDBM_verts_mirror_cache_begin(em, false, true);
 	}
 
 	repeat = RNA_int_get(op->ptr, "repeat");
@@ -2623,6 +2623,7 @@ static int edbm_separate_exec(bContext *C, wmOperator *op)
 	if (retval) {
 		/* delay depsgraph recalc until all objects are duplicated */
 		DAG_relations_tag_update(bmain);
+		WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
 
 		return OPERATOR_FINISHED;
 	}
