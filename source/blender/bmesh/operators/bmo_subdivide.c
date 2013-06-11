@@ -209,8 +209,8 @@ static void alter_co(BMVert *v, BMEdge *UNUSED(origed), const SubDParams *params
 	}
 
 	if (params->use_fractal) {
-		float len = len_v3v3(vsta->co, vend->co);
-		float normal[3] = {0.0f, 0.0f, 0.0f}, co2[3], base1[3], base2[3];
+		const float len = len_v3v3(vsta->co, vend->co);
+		float normal[3], co2[3], base1[3], base2[3];
 
 		fac = params->fractal * len;
 
@@ -856,7 +856,7 @@ void bmo_subdivide_edges_exec(BMesh *bm, BMOperator *op)
 	params.fractal = fractal;
 	params.along_normal = along_normal;
 	params.use_smooth  = (smooth  != 0.0f);
-	params.use_smooth_even = BMO_slot_get(op->slots_in, "use_smooth_even");
+	params.use_smooth_even = BMO_slot_bool_get(op->slots_in, "use_smooth_even");
 	params.use_fractal = (fractal != 0.0f);
 	params.use_sphere  = use_sphere;
 
