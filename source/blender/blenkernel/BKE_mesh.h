@@ -105,6 +105,10 @@ float BKE_mesh_calc_poly_area(struct MPoly *mpoly, struct MLoop *loopstart,
 void BKE_mesh_calc_poly_angles(struct MPoly *mpoly, struct MLoop *loopstart,
                                struct MVert *mvarray, float angles[]);
 
+int *BKE_mesh_calc_smoothgroups(const struct MEdge *medge, const int totedge,
+                                const struct MPoly *mpoly, const int totpoly,
+                                const struct MLoop *mloop, const int totloop);
+
 void BKE_mesh_calc_relative_deform(
         const struct MPoly *mpoly, const int totpoly,
         const struct MLoop *mloop, const int totvert,
@@ -198,7 +202,7 @@ struct BoundBox *BKE_mesh_boundbox_get(struct Object *ob);
 void BKE_mesh_texspace_get(struct Mesh *me, float r_loc[3], float r_rot[3], float r_size[3]);
 
 /* if old, it converts mface->edcode to edge drawflags */
-void BKE_mesh_make_edges(struct Mesh *me, int old);
+void BKE_mesh_make_edges(struct Mesh *me, const bool use_old);
 
 void BKE_mesh_strip_loose_faces(struct Mesh *me); /* Needed for compatibility (some old read code). */
 void BKE_mesh_strip_loose_polysloops(struct Mesh *me);
@@ -303,12 +307,17 @@ typedef struct IndexNode {
 	int index;
 } IndexNode;
 
-void BKE_mesh_vert_poly_map_create(MeshElemMap **map, int **mem,
+void BKE_mesh_vert_poly_map_create(MeshElemMap **r_map, int **r_mem,
                                    const struct MPoly *mface, const struct MLoop *mloop,
                                    int totvert, int totface, int totloop);
 
-void BKE_mesh_vert_edge_map_create(MeshElemMap **map, int **mem,
+void BKE_mesh_vert_edge_map_create(MeshElemMap **r_map, int **r_mem,
                                    const struct MEdge *medge, int totvert, int totedge);
+
+void BKE_mesh_edge_poly_map_create(MeshElemMap **r_map, int **r_mem,
+                                   const struct MEdge *medge, const int totedge,
+                                   const struct MPoly *mpoly, const int totpoly,
+                                   const struct MLoop *mloop, const int totloop);
 
 /* vertex level transformations & checks (no derived mesh) */
 
