@@ -3203,26 +3203,40 @@ static float mesh_calc_poly_planar_area_centroid(MPoly *mpoly, MLoop *loopstart,
 	return total_area;
 }
 
-
+/**
+ * Calculate smooth groups from sharp edges.
+ *
+ * \param r_totgroup The total number of groups, 1 or more.
+ * \return Polygon aligned array of group index values (starting at 1)
+ */
 int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
                                 const MPoly *mpoly, const int totpoly,
-                                const MLoop *mloop, const int totloop)
+                                const MLoop *mloop, const int totloop,
+                                int *r_totgroup)
 {
-	int *poly_groups = MEM_callocN(sizeof(int) * totpoly, __func__);
-	int *poly_stack  = MEM_mallocN(sizeof(int) * totpoly, __func__);
+	int *poly_groups;
+	int *poly_stack;
 	STACK_DECLARE(poly_stack);
 
 	int poly_prev = 0;
-	int poly_group_id = 1;
+	int poly_group_id = 0;
 
 	/* map vars */
 	MeshElemMap *edge_poly_map;
 	int *edge_poly_mem;
 
+	if (totpoly == 0) {
+		*r_totgroup = 0;
+		return NULL;
+	}
+
 	BKE_mesh_edge_poly_map_create(&edge_poly_map, &edge_poly_mem,
 	                              medge, totedge,
 	                              mpoly, totpoly,
 	                              mloop, totloop);
+
+	poly_groups = MEM_callocN(sizeof(int) * totpoly, __func__);
+	poly_stack  = MEM_mallocN(sizeof(int) * totpoly, __func__);
 
 	STACK_INIT(poly_stack);
 
@@ -3242,6 +3256,9 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 
 		/* start searching from here next time */
 		poly_prev = poly + 1;
+
+		/* group starts at 1 */
+		poly_group_id++;
 
 		poly_groups[poly] = poly_group_id;
 		STACK_PUSH(poly_stack, poly);
@@ -3273,8 +3290,6 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 				}
 			}
 		}
-
-		poly_group_id++;
 	}
 
 	MEM_freeN(edge_poly_map);
@@ -3282,6 +3297,8 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 	MEM_freeN(poly_stack);
 
 	STACK_FREE(poly_stack);
+
+	*r_totgroup = poly_group_id;
 
 	return poly_groups;
 }
@@ -3749,4 +3766,133 @@ void BKE_mesh_do_versions_cd_flag_init(Mesh *mesh)
 		}
 
 	}
+}
+
+
+/* -------------------------------------------------------------------- */
+/* MSelect functions (currently used in weight paint mode) */
+
+void BKE_mesh_mselect_clear(Mesh *me)
+{
+	if (me->mselect) {
+		MEM_freeN(me->mselect);
+		me->mselect = NULL;
+	}
+	me->totselect = 0;
+}
+
+void BKE_mesh_mselect_validate(Mesh *me)
+{
+	MSelect *mselect_src, *mselect_dst;
+	int i_src, i_dst;
+
+	if (me->totselect == 0)
+		return;
+
+	mselect_src = me->mselect;
+	mselect_dst = MEM_mallocN(sizeof(MSelect) * (me->totselect), "Mesh selection history");
+
+	for (i_src = 0, i_dst = 0; i_src < me->totselect; i_src++) {
+		int index = mselect_src[i_src].index;
+		switch (mselect_src[i_src].type) {
+			case ME_VSEL:
+			{
+				if (me->mvert[index].flag & SELECT) {
+					mselect_dst[i_dst] = mselect_src[i_src];
+					i_dst++;
+				}
+				break;
+			}
+			case ME_ESEL:
+			{
+				if (me->medge[index].flag & SELECT) {
+					mselect_dst[i_dst] = mselect_src[i_src];
+					i_dst++;
+				}
+				break;
+			}
+			case ME_FSEL:
+			{
+				if (me->mpoly[index].flag & SELECT) {
+					mselect_dst[i_dst] = mselect_src[i_src];
+					i_dst++;
+				}
+				break;
+			}
+			default:
+			{
+				BLI_assert(0);
+				break;
+			}
+		}
+	}
+
+	MEM_freeN(mselect_src);
+
+	if (i_dst == 0) {
+		MEM_freeN(mselect_dst);
+		mselect_dst = NULL;
+	}
+	else if (i_dst != me->totselect) {
+		mselect_dst = MEM_reallocN(mselect_dst, sizeof(MSelect) * i_dst);
+	}
+
+	me->totselect = i_dst;
+	me->mselect = mselect_dst;
+
+}
+
+/**
+ * Return the index within me->mselect, or -1
+ */
+int BKE_mesh_mselect_find(Mesh *me, int index, int type)
+{
+	int i;
+
+	BLI_assert(ELEM3(type, ME_VSEL, ME_ESEL, ME_FSEL));
+
+	for (i = 0; i < me->totselect; i++) {
+		if ((me->mselect[i].index == index) &&
+			(me->mselect[i].type == type))
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/**
+ * Return The index of the active element.
+ */
+int BKE_mesh_mselect_active_get(Mesh *me, int type)
+{
+	BLI_assert(ELEM3(type, ME_VSEL, ME_ESEL, ME_FSEL));
+
+	if (me->totselect) {
+		if (me->mselect[me->totselect - 1].type == type) {
+			return me->mselect[me->totselect - 1].index;
+		}
+	}
+	return -1;
+}
+
+void BKE_mesh_mselect_active_set(Mesh *me, int index, int type)
+{
+	const int msel_index = BKE_mesh_mselect_find(me, index, type);
+
+	if (msel_index == -1) {
+		/* add to the end */
+		me->mselect = MEM_reallocN(me->mselect, sizeof(MSelect) * (me->totselect + 1));
+		me->mselect[me->totselect].index = index;
+		me->mselect[me->totselect].type  = type;
+		me->totselect++;
+	}
+	else if (msel_index != me->totselect - 1) {
+		/* move to the end */
+		SWAP(MSelect, me->mselect[msel_index], me->mselect[me->totselect - 1]);
+	}
+
+	BLI_assert((me->mselect[me->totselect - 1].index == index) &&
+	           (me->mselect[me->totselect - 1].type  == type));
 }

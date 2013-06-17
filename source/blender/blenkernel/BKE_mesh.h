@@ -107,7 +107,8 @@ void BKE_mesh_calc_poly_angles(struct MPoly *mpoly, struct MLoop *loopstart,
 
 int *BKE_mesh_calc_smoothgroups(const struct MEdge *medge, const int totedge,
                                 const struct MPoly *mpoly, const int totpoly,
-                                const struct MLoop *mloop, const int totloop);
+                                const struct MLoop *mloop, const int totloop,
+                                int *r_totgroup);
 
 void BKE_mesh_calc_relative_deform(
         const struct MPoly *mpoly, const int totpoly,
@@ -359,6 +360,13 @@ void BKE_mesh_loops_to_mface_corners(struct CustomData *fdata, struct CustomData
 void BKE_mesh_poly_edgehash_insert(struct EdgeHash *ehash, const struct MPoly *mp, const struct MLoop *mloop);
 
 void BKE_mesh_do_versions_cd_flag_init(struct Mesh *mesh);
+
+
+void BKE_mesh_mselect_clear(struct Mesh *me);
+void BKE_mesh_mselect_validate(struct Mesh *me);
+int  BKE_mesh_mselect_find(struct Mesh *me, int index, int type);
+int  BKE_mesh_mselect_active_get(struct Mesh *me, int type);
+void BKE_mesh_mselect_active_set(struct Mesh *me, int index, int type);
 
 #ifdef __cplusplus
 }
