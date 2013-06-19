@@ -69,16 +69,28 @@
 #include <xmmintrin.h> /* SSE 1 */
 #include <emmintrin.h> /* SSE 2 */
 #include <pmmintrin.h> /* SSE 3 */
-#include <tmmintrin.h> /* SSE 3 */
+#include <tmmintrin.h> /* SSSE 3 */
 #include <smmintrin.h> /* SSE 4 */
 
+#ifndef __KERNEL_SSE2__
 #define __KERNEL_SSE2__
-#define __KERNEL_SSE3__
+#endif
+
+#ifndef __KERNEL_SSSE3__
+#define __KERNEL_SSSE3__
+#endif
+
+#ifndef __KERNEL_SSSE3__
+#define __KERNEL_SSSE3__
+#endif
+
+#ifndef __KERNEL_SSE4__
 #define __KERNEL_SSE4__
+#endif
 
 #else
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__KERNEL_SSSE3__)
 
 /* MinGW64 has conflicting declarations for these SSE headers in <windows.h>.
  * Since we can't avoid including <windows.h>, better only include that */
@@ -87,18 +99,26 @@
 #else
 #include <xmmintrin.h> /* SSE 1 */
 #include <emmintrin.h> /* SSE 2 */
+
+#ifdef __KERNEL_SSSE3__
+#include <pmmintrin.h> /* SSE 3 */
+#endif
+#ifdef __KERNEL_SSSE3__
+#include <tmmintrin.h> /* SSSE 3 */
+#endif
 #endif
 
+#ifndef __KERNEL_SSE2__
 #define __KERNEL_SSE2__
-
 #endif
 
 #endif
 
+#endif
+
+/* int8_t, uint16_t, and friends */
 #ifndef _WIN32
-
 #include <stdint.h>
-
 #endif
 
 #endif
@@ -469,6 +489,26 @@ __device_inline int4 make_int4(const float3& f)
 	return a;
 }
 
+#endif
+
+#ifdef __KERNEL_SSSE3__
+
+/* SSE shuffle utility functions */
+
+__device_inline const __m128 shuffle8(const __m128& a, const __m128i& shuf)
+{
+	return _mm_castsi128_ps(_mm_shuffle_epi8(_mm_castps_si128(a), shuf));
+}
+
+template<size_t i0, size_t i1, size_t i2, size_t i3> __device_inline const __m128 shuffle(const __m128& a, const __m128& b)
+{
+	return _mm_shuffle_ps(a, b, _MM_SHUFFLE(i3, i2, i1, i0));
+}
+
+template<size_t i0, size_t i1, size_t i2, size_t i3> __device_inline const __m128 shuffle(const __m128& b)
+{
+	return _mm_castsi128_ps(_mm_shuffle_epi32(_mm_castps_si128(b), _MM_SHUFFLE(i3, i2, i1, i0)));
+}
 #endif
 
 CCL_NAMESPACE_END
