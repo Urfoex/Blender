@@ -111,7 +111,7 @@ static int state_isect_co_exact(const PathContext *pc,
                                 const float co[3])
 {
 	const float diff = mul_v1_m3v3((float (*)[3])pc->matrix, co) - pc->axis_sep;
-	return (fabsf(diff) < CONNECT_EPS);
+	return (fabsf(diff) <= CONNECT_EPS);
 }
 
 static float state_calc_co_pair_fac(const PathContext *pc,
@@ -170,14 +170,14 @@ static void state_link_add(PathContext *pc, PathLinkState *state,
 		BLI_assert(0);
 	}
 
-	if (ele_prev == NULL) {
+	if (ele_from == NULL) {
 		printf("from NULL\n");
 	}
-	else if (ele_prev->head.htype == BM_EDGE) {
-		printf("from edge %d\n", BM_elem_index_get(ele_prev));
+	else if (ele_from->head.htype == BM_EDGE) {
+		printf("from edge %d\n", BM_elem_index_get(ele_from));
 	}
-	else if (ele_prev->head.htype == BM_FACE) {
-		printf("from face %d\n", BM_elem_index_get(ele_prev));
+	else if (ele_from->head.htype == BM_FACE) {
+		printf("from face %d\n", BM_elem_index_get(ele_from));
 	}
 	else {
 		BLI_assert(0);
@@ -286,6 +286,8 @@ static bool state_step(PathContext *pc, PathLinkState *state)
 				else {
 					state = state_step__face_edges(pc, state, &state_orig,
 					                               l_start->next, l_start);
+					state = state_step__face_verts(pc, state, &state_orig,
+					                               l_start->next->next, l_start);
 				}
 			}
 		}
