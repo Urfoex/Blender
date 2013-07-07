@@ -48,6 +48,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
+#include "BLI_bitmap.h"
 #include "BLI_scanfill.h"
 #include "BLI_array.h"
 
@@ -517,9 +518,9 @@ Mesh *BKE_mesh_copy_ex(Main *bmain, Mesh *me)
 		}
 	}
 
-	men->mselect = NULL;
 	men->edit_btmesh = NULL;
 
+	men->mselect = MEM_dupallocN(men->mselect);
 	men->bb = MEM_dupallocN(men->bb);
 	
 	men->key = BKE_key_copy(me->key);
@@ -2765,7 +2766,9 @@ int BKE_mesh_recalc_tessellation(CustomData *fdata,
 			BLI_scanfill_edge_add(&sf_ctx, sf_vert_last, sf_vert_first);
 #ifdef USE_TESSFACE_CALCNORMAL
 			add_newell_cross_v3_v3v3(normal, sf_vert_last->co, sf_vert_first->co);
-			normalize_v3(normal);
+			if (UNLIKELY(normalize_v3(normal) == 0.0f)) {
+				normal[2] = 1.0f;
+			}
 			totfilltri = BLI_scanfill_calc_ex(&sf_ctx, 0, normal);
 #else
 			totfilltri = BLI_scanfill_calc(&sf_ctx, 0);
@@ -3797,6 +3800,19 @@ void BKE_mesh_poly_edgehash_insert(EdgeHash *ehash, const MPoly *mp, const MLoop
 
 		ml = ml_next;
 		ml_next++;
+	}
+}
+
+void BKE_mesh_poly_edgebitmap_insert(unsigned int *edge_bitmap, const MPoly *mp, const MLoop *mloop)
+{
+	const MLoop *ml;
+	int i = mp->totloop;
+
+	ml = mloop;
+
+	while (i-- != 0) {
+		BLI_BITMAP_SET(edge_bitmap, ml->e);
+		ml++;
 	}
 }
 
