@@ -602,7 +602,7 @@ int calc_manipulator_stats(const bContext *C)
 					break;
 				}
 				/* if not gimbal, fall through to normal */
-				/* pass through */
+				/* fall-through */
 			}
 			case V3D_MANIP_NORMAL:
 			{
@@ -613,7 +613,7 @@ int calc_manipulator_stats(const bContext *C)
 					break;
 				}
 				/* no break we define 'normal' as 'local' in Object mode */
-				/* pass through */
+				/* fall-through */
 			}
 			case V3D_MANIP_LOCAL:
 			{
@@ -840,7 +840,8 @@ static void manipulator_setcolor(View3D *v3d, char axis, int colcode, unsigned c
 				UI_GetThemeColor3ubv(TH_AXIS_Z, col);
 				break;
 			default:
-				BLI_assert(!"invalid axis arg");
+				BLI_assert(0);
+				break;
 		}
 	}
 
@@ -1682,7 +1683,7 @@ static int manipulator_selectbuf(ScrArea *sa, ARegion *ar, const int mval[2], fl
 	rctf rect;
 	GLuint buffer[64];      // max 4 items per select, so large enuf
 	short hits;
-	extern void setwinmatrixview3d(ARegion *ar, View3D *v3d, rctf *rect); // XXX check a bit later on this... (ton)
+	extern void setwinmatrixview3d(ARegion *, View3D *, rctf *); // XXX check a bit later on this... (ton)
 
 	/* when looking through a selected camera, the manipulator can be at the
 	 * exact same position as the view, skip so we don't break selection */
