@@ -827,6 +827,10 @@ typedef struct NodeTranslateData {
 	char pad[6];
 } NodeTranslateData;
 
+typedef struct NodePlaneTrackDeformData {
+	char tracking_object[64];
+	char plane_track_name[64];
+} NodePlaneTrackDeformData;
 
 typedef struct NodeShaderScript {
 	int mode;
@@ -932,10 +936,6 @@ typedef struct NodeShaderNormalMap {
 /* wave texture */
 #define SHD_WAVE_BANDS		0
 #define SHD_WAVE_RINGS		1
-
-#define SHD_WAVE_SINE	0
-#define SHD_WAVE_SAW	1
-#define SHD_WAVE_TRI	2
 
 /* image/environment texture */
 #define SHD_COLORSPACE_NONE		0
