@@ -117,7 +117,7 @@ static unsigned int bm_edgenet_path_from_pass(
 		v_ls_tot += 1;
 		v = vn->prev;
 		vn = &vnet_info[BM_elem_index_get(v)];
-	} while ((vn->pass == pass));
+	} while (vn->pass == pass);
 
 	return v_ls_tot;
 }
@@ -132,7 +132,7 @@ static bool bm_edgenet_path_check_overlap(
 {
 	/* vert order doesn't matter */
 	unsigned int v_ls_tot = 0;
-	LinkNode *v_ls;
+	LinkNode *v_ls = NULL;
 	BMVert *v_pair[2] = {v1, v2};
 	unsigned int i;
 
@@ -145,7 +145,7 @@ static bool bm_edgenet_path_check_overlap(
 			v_ls_tot += 1;
 			v = vn->prev;
 			vn = &vnet_info[BM_elem_index_get(v)];
-		} while ((vn->pass == pass));
+		} while (vn->pass == pass);
 	}
 
 	if (v_ls_tot) {
@@ -443,7 +443,8 @@ static LinkNode *bm_edgenet_path_calc_best(
  * \param use_edge_tag  Only fill tagged edges.
  * \param face_oflag  if nonzero, apply all new faces with this bmo flag.
  */
-void BM_mesh_edgenet(BMesh *bm, const bool use_edge_tag, const short face_oflag)
+void BM_mesh_edgenet(BMesh *bm,
+                     const bool use_edge_tag, const bool use_new_face_tag)
 {
 	VertNetInfo *vnet_info = MEM_callocN(sizeof(*vnet_info) * (size_t)bm->totvert, __func__);
 	BLI_mempool *edge_queue_pool = BLI_mempool_create(sizeof(LinkNode), 1, 512, 0);
@@ -491,8 +492,8 @@ void BM_mesh_edgenet(BMesh *bm, const bool use_edge_tag, const short face_oflag)
 				}
 			} while ((l_iter = l_iter->next) != l_first);
 
-			if (face_oflag) {
-				BMO_elem_flag_enable(bm, f, face_oflag);
+			if (use_new_face_tag) {
+				BM_elem_flag_enable(f, BM_ELEM_TAG);
 			}
 
 			/* the face index only needs to be unique, not kept valid */

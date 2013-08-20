@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Blender Foundation.
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,35 +14,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2013 Blender Foundation.
+ * All rights reserved.
+ *
+ * The Original Code is: all of this file.
+ *
+ * Contributor(s): Benoit Bolsee,
+ *                 Sergey Sharybin.
+ *
+ * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __UTIL_MEMARENA_H__
-#define __UTIL_MEMARENA_H__
+#ifndef __BLI_SORT_H__
+#define __BLI_SORT_H__
 
-#include <stdlib.h>
+/** \file BLI_sort.h
+ *  \ingroup bli
+ */
 
-#include "util_list.h"
-#include "util_types.h"
+/* Quick sort reentrant */
+typedef int (*BLI_sort_cmp_t)(void *ctx, const void *a, const void *b);
 
-CCL_NAMESPACE_BEGIN
+void BLI_qsort_r(void *a, size_t n, size_t es, void *thunk, BLI_sort_cmp_t cmp);
 
-class MemArena {
-public:
-	MemArena(bool use_calloc = true, size_t buffer_size = (1<<14));
-	~MemArena();
-
-	void *alloc(size_t size);
-
-protected:
-	bool use_calloc;
-	size_t buffer_size;
-
-	list<uint8_t*> buffers;
-	uint8_t *last_buffer;
-	size_t last_left;
-};
-
-CCL_NAMESPACE_END
-
-#endif /* __UTIL_MEMARENA_H__ */
-
+#endif  /* __BLI_SORT_H__ */

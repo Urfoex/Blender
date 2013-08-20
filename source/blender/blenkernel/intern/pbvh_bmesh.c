@@ -92,7 +92,7 @@ static void pbvh_bmesh_node_finalize(PBVH *bvh, int node_index)
 	if (!G.background) {
 		int smooth = bvh->flags & PBVH_DYNTOPO_SMOOTH_SHADING;
 		n->draw_buffers = GPU_build_bmesh_buffers(smooth);
-		n->flag |= PBVH_UpdateDrawBuffers;
+		n->flag |= PBVH_UpdateDrawBuffers | PBVH_UpdateNormals;
 	}
 }
 
@@ -386,6 +386,7 @@ static void pbvh_bmesh_vert_remove(PBVH *bvh, BMVert *v)
 
 	BLI_assert(BLI_ghash_haskey(bvh->bm_vert_to_node, v));
 	v_node = pbvh_bmesh_node_lookup(bvh, bvh->bm_vert_to_node, v);
+	BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 	BLI_ghash_remove(v_node->bm_unique_verts, v, NULL, NULL);
 	BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 
@@ -393,7 +394,9 @@ static void pbvh_bmesh_vert_remove(PBVH *bvh, BMVert *v)
 	BM_ITER_ELEM (f, &bm_iter, v, BM_FACES_OF_VERT) {
 		PBVHNode *f_node = pbvh_bmesh_node_lookup(bvh, bvh->bm_face_to_node, f);
 
-		BLI_ghash_remove(f_node->bm_unique_verts, v, NULL, NULL);
+		/* Remove current ownership */
+		/* Should be handled above by vert_to_node removal, leaving just in case - psy-fi */
+		//BLI_ghash_remove(f_node->bm_unique_verts, v, NULL, NULL);
 		BLI_ghash_remove(f_node->bm_other_verts, v, NULL, NULL);
 
 		BLI_assert(!BLI_ghash_haskey(f_node->bm_unique_verts, v));
@@ -426,6 +429,9 @@ static void pbvh_bmesh_face_remove(PBVH *bvh, BMFace *f)
 
 				if (new_node) {
 					pbvh_bmesh_vert_ownership_transfer(bvh, new_node, v);
+				} else {
+					BLI_ghash_remove(f_node->bm_unique_verts, v, NULL, NULL);
+					BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 				}
 			}
 			else {
@@ -686,7 +692,7 @@ static void pbvh_bmesh_split_edge(PBVH *bvh, EdgeQueue *q, BLI_mempool *pool,
 		ni = GET_INT_FROM_POINTER(nip);
 
 		/* Ensure node gets redrawn */
-		bvh->nodes[ni].flag |= PBVH_UpdateDrawBuffers;
+		bvh->nodes[ni].flag |= PBVH_UpdateDrawBuffers | PBVH_UpdateNormals;
 
 		/* Find the vertex not in the edge */
 		v_opp = l_adj->prev->v;
@@ -1012,19 +1018,28 @@ int pbvh_bmesh_node_raycast(PBVHNode *node, const float ray_start[3],
 	return hit;
 }
 
+
 void pbvh_bmesh_normals_update(PBVHNode **nodes, int totnode)
 {
 	int n;
 
 	for (n = 0; n < totnode; n++) {
 		PBVHNode *node = nodes[n];
-		GHashIterator gh_iter;
 
-		GHASH_ITER (gh_iter, node->bm_faces) {
-			BM_face_normal_update(BLI_ghashIterator_getKey(&gh_iter));
-		}
-		GHASH_ITER (gh_iter, node->bm_unique_verts) {
+		if (node->flag & PBVH_UpdateNormals) {
+			GHashIterator gh_iter;
+
+			GHASH_ITER (gh_iter, node->bm_faces) {
+				BM_face_normal_update(BLI_ghashIterator_getKey(&gh_iter));
+			}
+			GHASH_ITER (gh_iter, node->bm_unique_verts) {
+				BM_vert_normal_update(BLI_ghashIterator_getKey(&gh_iter));
+			}
+			/* This should be unneeded normally */
+			GHASH_ITER (gh_iter, node->bm_other_verts) {
 			BM_vert_normal_update(BLI_ghashIterator_getKey(&gh_iter));
+			}
+			node->flag &= ~PBVH_UpdateNormals;
 		}
 	}
 }
@@ -1362,7 +1377,9 @@ void print_flag_factors(int flag)
 void pbvh_bmesh_verify(PBVH *bvh)
 {
 	GHashIterator gh_iter;
-	int i;
+	int i, vert_count = 0;
+	BMIter iter;
+	BMVert *vi;
 
 	/* Check faces */
 	BLI_assert(bvh->bm->totface == BLI_ghash_size(bvh->bm_face_to_node));
@@ -1428,7 +1445,36 @@ void pbvh_bmesh_verify(PBVH *bvh)
 			}
 		}
 		BLI_assert(found);
+
+		#if 0
+		/* total freak stuff, check if node exists somewhere else */
+		/* Slow */
+		for (i = 0; i < bvh->totnode; i++) {
+			PBVHNode *n = &bvh->nodes[i];
+			if (i != ni && n->bm_unique_verts)
+				BLI_assert(!BLI_ghash_haskey(n->bm_unique_verts, v));
+		}
+
+		#endif
 	}
+
+	#if 0
+	/* check that every vert belongs somewhere */
+	/* Slow */
+	BM_ITER_MESH (vi, &iter, bvh->bm, BM_VERTS_OF_MESH) {
+		bool has_unique = false;
+		for (i = 0; i < bvh->totnode; i++) {
+			PBVHNode *n = &bvh->nodes[i];
+			if ((n->bm_unique_verts != NULL) && BLI_ghash_haskey(n->bm_unique_verts, vi))
+				has_unique = true;
+		}
+		BLI_assert(has_unique);
+		vert_count++;
+	}
+
+	/* if totvert differs from number of verts inside the hash. hash-totvert is checked above  */
+	BLI_assert(vert_count == bvh->bm->totvert);
+	#endif
 
 	/* Check that node elements are recorded in the top level */
 	for (i = 0; i < bvh->totnode; i++) {
