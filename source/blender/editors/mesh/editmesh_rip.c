@@ -50,6 +50,9 @@
 #include "ED_transform.h"
 #include "ED_view3d.h"
 
+#include "bmesh.h"
+#include "bmesh_tools.h"
+
 #include "mesh_intern.h"  /* own include */
 
 /**
@@ -73,14 +76,14 @@ static float edbm_rip_edgedist_squared(ARegion *ar, float mat[4][4],
 		const float dist_2d = len_v2v2(vec1, vec2);
 		if (dist_2d > FLT_EPSILON) {
 			const float dist = inset / dist_2d;
-			BLI_assert(isfinite(dist));
+			BLI_assert(finite(dist));
 			interp_v2_v2v2(vec1, vec1, vec2, dist);
 			interp_v2_v2v2(vec2, vec2, vec1, dist);
 		}
 	}
 
 	dist_sq = dist_squared_to_line_segment_v2(mvalf, vec1, vec2);
-	BLI_assert(isfinite(dist_sq));
+	BLI_assert(finite(dist_sq));
 
 	return dist_sq;
 }
@@ -494,7 +497,7 @@ static void edbm_tagged_loop_pairs_do_fill_faces(BMesh *bm, UnorderedLoopPair *u
 			/* face should never exist */
 			BLI_assert(BM_face_exists(f_verts, f_verts[3] ? 4 : 3, &f) == false);
 
-			f = BM_face_create_quad_tri_v(bm, f_verts, f_verts[3] ? 4 : 3, f_example, false);
+			f = BM_face_create_verts(bm, f_verts, f_verts[3] ? 4 : 3, f_example, BM_CREATE_NOP, true);
 
 			l_iter = BM_FACE_FIRST_LOOP(f);
 

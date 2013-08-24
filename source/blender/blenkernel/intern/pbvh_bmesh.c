@@ -278,7 +278,7 @@ static BMVert *pbvh_bmesh_vert_create(PBVH *bvh, int node_index,
                                       const float co[3],
                                       const BMVert *example)
 {
-	BMVert *v = BM_vert_create(bvh->bm, co, example, 0);
+	BMVert *v = BM_vert_create(bvh->bm, co, example, BM_CREATE_NOP);
 	void *val = SET_INT_IN_POINTER(node_index);
 
 	BLI_assert((bvh->totnode == 1 || node_index) && node_index <= bvh->totnode);
@@ -302,9 +302,7 @@ static BMFace *pbvh_bmesh_face_create(PBVH *bvh, int node_index,
 	/* ensure we never add existing face */
 	BLI_assert(BM_face_exists(v_tri, 3, NULL) == false);
 
-	f = BM_face_create(bvh->bm, v_tri, e_tri, 3, 0);
-	// BM_elem_attrs_copy(bvh->bm, bvh->bm, f_example, f);
-	f->mat_nr = f_example->mat_nr;
+	f = BM_face_create(bvh->bm, v_tri, e_tri, 3, f_example, BM_CREATE_NOP);
 
 	if (!BLI_ghash_haskey(bvh->bm_face_to_node, f)) {
 
@@ -367,11 +365,10 @@ static void pbvh_bmesh_vert_ownership_transfer(PBVH *bvh, PBVHNode *new_owner,
 	BLI_assert(current_owner != new_owner);
 
 	/* Remove current ownership */
-	// BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);  // assign handles below
 	BLI_ghash_remove(current_owner->bm_unique_verts, v, NULL, NULL);
 
 	/* Set new ownership */
-	BLI_ghash_assign(bvh->bm_vert_to_node, v,
+	BLI_ghash_reinsert(bvh->bm_vert_to_node, v,
 	                 SET_INT_IN_POINTER(new_owner - bvh->nodes), NULL, NULL);
 	BLI_ghash_insert(new_owner->bm_unique_verts, v, NULL);
 	BLI_ghash_remove(new_owner->bm_other_verts, v, NULL, NULL);
@@ -386,7 +383,6 @@ static void pbvh_bmesh_vert_remove(PBVH *bvh, BMVert *v)
 
 	BLI_assert(BLI_ghash_haskey(bvh->bm_vert_to_node, v));
 	v_node = pbvh_bmesh_node_lookup(bvh, bvh->bm_vert_to_node, v);
-	BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 	BLI_ghash_remove(v_node->bm_unique_verts, v, NULL, NULL);
 	BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 
@@ -429,7 +425,8 @@ static void pbvh_bmesh_face_remove(PBVH *bvh, BMFace *f)
 
 				if (new_node) {
 					pbvh_bmesh_vert_ownership_transfer(bvh, new_node, v);
-				} else {
+				}
+				else {
 					BLI_ghash_remove(f_node->bm_unique_verts, v, NULL, NULL);
 					BLI_ghash_remove(bvh->bm_vert_to_node, v, NULL, NULL);
 				}
@@ -1037,7 +1034,7 @@ void pbvh_bmesh_normals_update(PBVHNode **nodes, int totnode)
 			}
 			/* This should be unneeded normally */
 			GHASH_ITER (gh_iter, node->bm_other_verts) {
-			BM_vert_normal_update(BLI_ghashIterator_getKey(&gh_iter));
+				BM_vert_normal_update(BLI_ghashIterator_getKey(&gh_iter));
 			}
 			node->flag &= ~PBVH_UpdateNormals;
 		}
