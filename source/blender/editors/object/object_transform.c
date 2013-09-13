@@ -551,7 +551,7 @@ static int apply_objects_internal(bContext *C, ReportList *reports, int apply_lo
 			}
 		}
 		else if (ob->type == OB_CAMERA) {
-			MovieClip *clip = BKE_object_movieclip_get(scene, ob, FALSE);
+			MovieClip *clip = BKE_object_movieclip_get(scene, ob, false);
 
 			/* applying scale on camera actually scales clip's reconstruction.
 			 * of there's clip assigned to camera nothing to do actually.
@@ -785,7 +785,7 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 	}
 
 	if (ctx_ob_act) {
-		BLI_rotatelist(&ctx_data_list, (LinkData *)ctx_ob_act);
+		BLI_rotatelist_first(&ctx_data_list, (LinkData *)ctx_ob_act);
 	}
 
 	for (tob = bmain->object.first; tob; tob = tob->id.next) {

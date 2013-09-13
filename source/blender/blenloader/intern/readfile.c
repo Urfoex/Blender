@@ -4367,12 +4367,8 @@ static void lib_link_object(FileData *fd, Main *main)
 			for (sens = ob->sensors.first; sens; sens = sens->next) {
 				for (a = 0; a < sens->totlinks; a++)
 					sens->links[a] = newglobadr(fd, sens->links[a]);
-				
-				if (sens->type == SENS_TOUCH) {
-					bTouchSensor *ts = sens->data;
-					ts->ma = newlibadr(fd, ob->id.lib, ts->ma);
-				}
-				else if (sens->type == SENS_MESSAGE) {
+
+				if (sens->type == SENS_MESSAGE) {
 					bMessageSensor *ms = sens->data;
 					ms->fromObject =
 						newlibadr(fd, ob->id.lib, ms->fromObject);
@@ -7070,7 +7066,9 @@ static const char *dataname(short id_code)
 		case ID_BR: return "Data from BR";
 		case ID_PA: return "Data from PA";
 		case ID_GD: return "Data from GD";
+		case ID_WM: return "Data from WM";
 		case ID_MC: return "Data from MC";
+		case ID_MSK: return "Data from MSK";
 		case ID_LS: return "Data from LS";
 	}
 	return "Data from Lib Block";
@@ -9534,8 +9532,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
-	if (MAIN_VERSION_OLDER(main, 267, 1))
-	{
+	if (MAIN_VERSION_OLDER(main, 267, 1)) {
 		Object *ob;
 
 		for (ob = main->object.first; ob; ob = ob->id.next) {
@@ -9579,9 +9576,23 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		#undef BRUSH_FIXED
 	}
 	
-	{
+
+	if (!MAIN_VERSION_ATLEAST(main, 268, 4)) {
 		bScreen *sc;
 		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			bConstraint *con;
+			for (con = ob->constraints.first; con; con = con->next) {
+				if (con->type == CONSTRAINT_TYPE_SHRINKWRAP) {
+					bShrinkwrapConstraint *data = (bShrinkwrapConstraint *)con->data;
+					if      (data->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_X_AXIS) data->projAxis = OB_POSX;
+					else if (data->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Y_AXIS) data->projAxis = OB_POSY;
+					else                                                          data->projAxis = OB_POSZ;
+					data->projAxisSpace = CONSTRAINT_SPACE_LOCAL;
+				}
+			}
+		}
 
 		for (ob = main->object.first; ob; ob = ob->id.next) {
 			ModifierData *md;
@@ -9613,6 +9624,66 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							snode->zoom = 1.0;
 						}
 					}
+				}
+			}
+		}
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			bSensor *sens;
+			bTouchSensor *ts;
+			bCollisionSensor *cs;
+			Material *ma;
+
+			for (sens = ob->sensors.first; sens; sens = sens->next) {
+				if (sens->type == SENS_TOUCH) {
+					ts = sens->data;
+					cs = MEM_callocN(sizeof(bCollisionSensor), "touch -> collision sensor do_version");
+
+					if (ts->ma) {
+						ma = blo_do_versions_newlibadr(fd, ob->id.lib, ts->ma);
+						BLI_strncpy(cs->materialName, ma->id.name+2, sizeof(cs->materialName));
+					}
+
+					cs->mode = SENS_COLLISION_MATERIAL;
+
+					MEM_freeN(ts);
+
+					sens->data = cs;
+					sens->type = sens->otype = SENS_COLLISION;
+				}
+			}
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 268, 5)) {
+		bScreen *sc;
+		ScrArea *sa;
+
+		/* add missing (+) expander in node editor */
+		for (sc = main->screen.first; sc; sc = sc->id.next) {
+			for (sa = sc->areabase.first; sa; sa = sa->next) {
+				ARegion *ar, *arnew;
+
+				if (sa->spacetype == SPACE_NODE) {
+					ar = BKE_area_find_region_type(sa, RGN_TYPE_TOOLS);
+
+					if (ar)
+						continue;
+
+					/* add subdiv level; after header */
+					ar = BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+					
+					/* is error! */
+					if (ar == NULL)
+						continue;
+
+					arnew = MEM_callocN(sizeof(ARegion), "node tools");
+					
+					BLI_insertlinkafter(&sa->regionbase, ar, arnew);
+					arnew->regiontype = RGN_TYPE_TOOLS;
+					arnew->alignment = RGN_ALIGN_LEFT;
+					
+					arnew->flag = RGN_FLAG_HIDDEN;
 				}
 			}
 		}
@@ -10517,11 +10588,7 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		expand_doit(fd, mainvar, psys->part);
 	
 	for (sens = ob->sensors.first; sens; sens = sens->next) {
-		if (sens->type == SENS_TOUCH) {
-			bTouchSensor *ts = sens->data;
-			expand_doit(fd, mainvar, ts->ma);
-		}
-		else if (sens->type == SENS_MESSAGE) {
+		if (sens->type == SENS_MESSAGE) {
 			bMessageSensor *ms = sens->data;
 			expand_doit(fd, mainvar, ms->fromObject);
 		}

@@ -837,7 +837,7 @@ void ui_but_add_shortcut(uiBut *but, const char *shortcut_str, const bool do_str
 {
 
 	if (do_strip) {
-		char *cpoin = strchr(but->str, '|');
+		char *cpoin = strchr(but->str, UI_SEP_CHAR);
 		if (cpoin) {
 			*cpoin = '\0';
 		}
@@ -855,7 +855,7 @@ void ui_but_add_shortcut(uiBut *but, const char *shortcut_str, const bool do_str
 		}
 		BLI_snprintf(but->strdata,
 		             sizeof(but->strdata),
-		             "%s|%s",
+		             "%s" UI_SEP_CHAR_S "%s",
 		             butstr_orig, shortcut_str);
 		MEM_freeN(butstr_orig);
 		but->str = but->strdata;
@@ -985,7 +985,7 @@ static bool ui_but_event_property_operator_string(const bContext *C, uiBut *but,
 			
 			IDPropertyTemplate val = {0};
 			prop_path = IDP_New(IDP_GROUP, &val, __func__);
-			prop_path_value = IDP_NewString(data_path, "data_path", strlen(data_path) + 1); /* len + 1, or else will be truncated */
+			prop_path_value = IDP_NewString(data_path, "data_path", strlen(data_path) + 1);
 			IDP_AddToGroup(prop_path, prop_path_value);
 			
 			/* check each until one works... */

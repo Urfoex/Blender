@@ -811,7 +811,6 @@ class CyclesWorld_PT_volume(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.active = False
 
         world = context.world
         panel_node_draw(layout, world, 'OUTPUT_WORLD', 'Volume')
@@ -831,12 +830,13 @@ class CyclesWorld_PT_ambient_occlusion(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+
         light = context.world.light_settings
 
-        layout.active = light.use_ambient_occlusion
-
         row = layout.row()
-        row.prop(light, "ao_factor", text="Factor")
+        sub = row.row()
+        sub.active = light.use_ambient_occlusion
+        sub.prop(light, "ao_factor", text="Factor")
         row.prop(light, "distance", text="Distance")
 
 
@@ -957,7 +957,6 @@ class CyclesMaterial_PT_volume(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.active = False
 
         mat = context.material
         cmat = mat.cycles

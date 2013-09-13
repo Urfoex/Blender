@@ -630,6 +630,22 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 	RE_init_threadcount(re);
 }
 
+/* update some variables that can be animated, and otherwise wouldn't be due to
+ * RenderData getting copied once at the start of animation render */
+static void render_update_anim_renderdata(Render *re, RenderData *rd)
+{
+	/* filter */
+	re->r.gauss = rd->gauss;
+
+	/* motion blur */
+	re->r.mblur_samples = rd->mblur_samples;
+	re->r.blurfac = rd->blurfac;
+
+	/* freestyle */
+	re->r.line_thickness_mode = rd->line_thickness_mode;
+	re->r.unit_line_thickness = rd->unit_line_thickness;
+}
+
 void RE_SetWindow(Render *re, rctf *viewplane, float clipsta, float clipend)
 {
 	/* re->ok flag? */
@@ -2373,7 +2389,7 @@ static void update_physics_cache(Render *re, Scene *scene, int UNUSED(anim_init)
 	BKE_ptcache_bake(&baker);
 }
 /* evaluating scene options for general Blender render */
-static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, Object *camera_override, unsigned int lay, int anim, int anim_init)
+static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, Object *camera_override, unsigned int lay_override, int anim, int anim_init)
 {
 	int winx, winy;
 	rcti disprect;
@@ -2403,11 +2419,12 @@ static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, Sc
 	re->scene = scene;
 	re->scene_color_manage = BKE_scene_check_color_management_enabled(scene);
 	re->camera_override = camera_override;
-	re->lay = lay;
-	re->i.localview = (lay & 0xFF000000) != 0;
+	re->lay = lay_override ? lay_override : scene->lay;
+	re->i.localview = (re->lay & 0xFF000000) != 0;
 	
 	/* not too nice, but it survives anim-border render */
 	if (anim) {
+		render_update_anim_renderdata(re, &scene->r);
 		re->disprect = disprect;
 		return 1;
 	}
@@ -2452,14 +2469,14 @@ void RE_SetReports(Render *re, ReportList *reports)
 }
 
 /* general Blender frame render call */
-void RE_BlenderFrame(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, Object *camera_override, unsigned int lay, int frame, const short write_still)
+void RE_BlenderFrame(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, Object *camera_override, unsigned int lay_override, int frame, const short write_still)
 {
 	/* ugly global still... is to prevent preview events and signal subsurfs etc to make full resol */
 	G.is_rendering = TRUE;
 	
 	scene->r.cfra = frame;
 	
-	if (render_initialize_from_main(re, bmain, scene, srl, camera_override, lay, 0, 0)) {
+	if (render_initialize_from_main(re, bmain, scene, srl, camera_override, lay_override, 0, 0)) {
 		MEM_reset_peak_memory();
 
 		BLI_callback_exec(re->main, (ID *)scene, BLI_CB_EVT_RENDER_PRE);
@@ -2525,7 +2542,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 		}
 
 
-		IMB_colormanagement_imbuf_for_write(ibuf, TRUE, FALSE, &scene->view_settings,
+		IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
 		                                    &scene->display_settings, &scene->r.im_format);
 
 		ok = mh->append_movie(&re->r, scene->r.sfra, scene->r.cfra, (int *) ibuf->rect,
@@ -2556,7 +2573,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 		else {
 			ImBuf *ibuf = render_result_rect_to_ibuf(&rres, &scene->r);
 
-			IMB_colormanagement_imbuf_for_write(ibuf, TRUE, FALSE, &scene->view_settings,
+			IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
 			                                    &scene->display_settings, &scene->r.im_format);
 
 			ok = BKE_imbuf_write_stamp(scene, camera, ibuf, name, &scene->r.im_format);
@@ -2576,7 +2593,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 				BKE_add_image_extension(name, &imf);
 				ibuf->planes = 24;
 
-				IMB_colormanagement_imbuf_for_write(ibuf, TRUE, FALSE, &scene->view_settings,
+				IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
 				                                    &scene->display_settings, &imf);
 
 				BKE_imbuf_write_stamp(scene, camera, ibuf, name, &imf);
@@ -2608,14 +2625,14 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 }
 
 /* saves images to disk */
-void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_override, unsigned int lay, int sfra, int efra, int tfra)
+void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_override, unsigned int lay_override, int sfra, int efra, int tfra)
 {
 	bMovieHandle *mh = BKE_movie_handle_get(scene->r.im_format.imtype);
 	int cfrao = scene->r.cfra;
 	int nfra, totrendered = 0, totskipped = 0;
 	
 	/* do not fully call for each frame, it initializes & pops output window */
-	if (!render_initialize_from_main(re, bmain, scene, NULL, camera_override, lay, 0, 1))
+	if (!render_initialize_from_main(re, bmain, scene, NULL, camera_override, lay_override, 0, 1))
 		return;
 	
 	/* ugly global still... is to prevent renderwin events and signal subsurfs etc to make full resol */
@@ -2660,7 +2677,7 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 			char name[FILE_MAX];
 			
 			/* only border now, todo: camera lens. (ton) */
-			render_initialize_from_main(re, bmain, scene, NULL, camera_override, lay, 1, 0);
+			render_initialize_from_main(re, bmain, scene, NULL, camera_override, lay_override, 1, 0);
 
 			if (nfra != scene->r.cfra) {
 				/*
@@ -2918,7 +2935,7 @@ int RE_WriteEnvmapResult(struct ReportList *reports, Scene *scene, EnvMap *env, 
 		return 0;
 	}
 
-	IMB_colormanagement_imbuf_for_write(ibuf, TRUE, FALSE, &scene->view_settings, &scene->display_settings, &imf);
+	IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings, &scene->display_settings, &imf);
 
 	/* to save, we first get absolute path */
 	BLI_strncpy(filepath, relpath, sizeof(filepath));
