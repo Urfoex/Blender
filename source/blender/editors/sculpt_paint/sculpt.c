@@ -318,8 +318,6 @@ typedef struct StrokeCache {
 	float plane_trim_squared;
 
 	rcti previous_r; /* previous redraw rectangle */
-
-	bool frontface; /* use front face */
 } StrokeCache;
 
 /************** Access to original unmodified vertex data *************/
@@ -671,10 +669,10 @@ static int sculpt_brush_test_cube(SculptBrushTest *test, float co[3], float loca
 	}
 }
 
-static float frontface(bool ff, const float sculpt_normal[3],
+static float frontface(Brush *br, const float sculpt_normal[3],
                        const short no[3], const float fno[3])
 {
-	if (ff) {
+	if (br->flag & BRUSH_FRONTFACE) {
 		float dot;
 
 		if (no) {
@@ -1011,7 +1009,7 @@ static float tex_strength(SculptSession *ss, Brush *br,
 	/* Falloff curve */
 	avg *= BKE_brush_curve_strength(br, len, cache->radius);
 
-	avg *= frontface(cache->frontface, sculpt_normal, vno, fno);
+	avg *= frontface(br, sculpt_normal, vno, fno);
 
 	/* Paint mask */
 	avg *= 1.0f - mask;
@@ -1289,13 +1287,13 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 
 /* Test whether the StrokeCache.sculpt_normal needs update in
  * do_brush_action() */
-static int brush_needs_sculpt_normal(const Brush *brush, SculptSession *ss)
+static int brush_needs_sculpt_normal(const Brush *brush)
 {
 	return ((ELEM(brush->sculpt_tool,
 	              SCULPT_TOOL_GRAB,
 	              SCULPT_TOOL_SNAKE_HOOK) &&
 	         ((brush->normal_weight > 0) ||
-	          ss->cache->frontface)) ||
+	          (brush->flag & BRUSH_FRONTFACE))) ||
 
 	        ELEM7(brush->sculpt_tool,
 	              SCULPT_TOOL_BLOB,
@@ -2498,7 +2496,7 @@ static void calc_area_normal_and_flatten_center(Sculpt *sd, Object *ob,
 	/* for flatten center */
 	if (count != 0)
 		mul_v3_fl(fc, 1.0f / count);
-	else if (count_flipped !=0 )
+	else if (count_flipped != 0)
 		mul_v3_v3fl(fc, fc_flip, 1.0f / count_flipped);
 	else
 		zero_v3(fc);
@@ -3139,7 +3137,7 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush)
 			BKE_pbvh_node_mark_update(nodes[n]);
 		}
 
-		if (brush_needs_sculpt_normal(brush, ss))
+		if (brush_needs_sculpt_normal(brush))
 			update_sculpt_normal(sd, ob, nodes, totnode);
 
 		if (brush->mtex.brush_map_mode == MTEX_MAP_MODE_AREA)
@@ -3797,15 +3795,26 @@ static void sculpt_update_cache_invariants(bContext *C, Sculpt *sd, SculptSessio
 	Object *ob = CTX_data_active_object(C);
 	float mat[3][3];
 	float viewDir[3] = {0.0f, 0.0f, 1.0f};
+	float max_scale;
 	int i;
 	int mode;
 
 	ss->cache = cache;
 
 	/* Set scaling adjustment */
-	cache->scale[0] = 1.0f / ob->size[0];
-	cache->scale[1] = 1.0f / ob->size[1];
-	cache->scale[2] = 1.0f / ob->size[2];
+	if (brush->sculpt_tool == SCULPT_TOOL_LAYER) {
+		max_scale = 1.0f;
+	}
+	else {
+		max_scale = 0.0f;
+		for (i = 0; i < 3; i ++) {
+			max_scale = max_ff(max_scale, fabsf(ob->size[i]));
+		}
+	}
+	cache->scale[0] = max_scale / ob->size[0];
+	cache->scale[1] = max_scale / ob->size[1];
+	cache->scale[2] = max_scale / ob->size[2];
+
 
 	cache->plane_trim_squared = brush->plane_trim * brush->plane_trim;
 
@@ -3905,10 +3914,10 @@ static void sculpt_update_cache_invariants(bContext *C, Sculpt *sd, SculptSessio
 		cache->original = 1;
 	}
 
-	if (ELEM8(brush->sculpt_tool,
+	if (ELEM9(brush->sculpt_tool,
 	          SCULPT_TOOL_DRAW, SCULPT_TOOL_CREASE, SCULPT_TOOL_BLOB,
 	          SCULPT_TOOL_LAYER, SCULPT_TOOL_INFLATE, SCULPT_TOOL_CLAY,
-	          SCULPT_TOOL_CLAY_STRIPS, SCULPT_TOOL_ROTATE))
+	          SCULPT_TOOL_CLAY_STRIPS, SCULPT_TOOL_ROTATE, SCULPT_TOOL_FLATTEN))
 	{
 		if (!(brush->flag & BRUSH_ACCUMULATE)) {
 			cache->original = 1;
@@ -3921,9 +3930,6 @@ static void sculpt_update_cache_invariants(bContext *C, Sculpt *sd, SculptSessio
 	cache->num_vertex_turns = 0;
 	cache->previous_vertex_rotation = 0;
 	cache->init_dir_set = false;
-
-	cache->frontface = ((brush->flag & BRUSH_FRONTFACE) != 0) ||
-	                     BKE_sculpt_brush_frontface_only(brush);
 
 	sculpt_omp_start(sd, ss);
 }
@@ -4682,10 +4688,7 @@ void sculpt_dynamic_topology_enable(bContext *C)
 	Object *ob = CTX_data_active_object(C);
 	SculptSession *ss = ob->sculpt;
 	Mesh *me = ob->data;
-	const BMAllocTemplate allocsize = {me->totvert,
-	                                   me->totedge,
-	                                   me->totloop,
-	                                   me->totpoly};
+	const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(me);
 
 	sculpt_pbvh_clear(ob);
 
@@ -4936,7 +4939,7 @@ int ED_sculpt_mask_layers_ensure(Object *ob, MultiresModifierData *mmd)
 	if (mmd && !CustomData_has_layer(&me->ldata, CD_GRID_PAINT_MASK)) {
 		GridPaintMask *gmask;
 		int level = max_ii(1, mmd->sculptlvl);
-		int gridsize = ccg_gridsize(level);
+		int gridsize = BKE_ccg_gridsize(level);
 		int gridarea = gridsize * gridsize;
 		int i, j;
 

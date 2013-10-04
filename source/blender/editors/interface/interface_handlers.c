@@ -2227,8 +2227,16 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 				break;
 				
 			case AKEY:
+
 				/* Ctrl + A: Select all */
-				if (event->ctrl && !(event->alt || event->shift || event->oskey)) {
+#if defined(__APPLE__)
+				/* OSX uses cmd-a systemwide, so add it */
+				if ((event->oskey && !(event->alt || event->shift || event->ctrl)) ||
+				    (event->ctrl  && !(event->alt || event->shift || event->oskey)))
+#else
+				if (event->ctrl && !(event->alt || event->shift || event->oskey))
+#endif
+				{
 					ui_textedit_move(but, data, STRCUR_DIR_PREV,
 					                 false, STRCUR_JUMP_ALL);
 					ui_textedit_move(but, data, STRCUR_DIR_NEXT,
@@ -5092,7 +5100,12 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
 
 	if (but->rnapoin.data && but->rnaprop) {
-		bool is_anim = RNA_property_animateable(&but->rnapoin, but->rnaprop);
+		PointerRNA *ptr = &but->rnapoin;
+		PropertyRNA *prop = but->rnaprop;
+		bool is_anim = RNA_property_animateable(ptr, prop);
+		bool is_editable = RNA_property_editable(ptr, prop);
+		/*bool is_idprop = RNA_property_is_idprop(prop);*/ /* XXX does not work as expected, not strictly needed */
+		bool is_set = RNA_property_is_set(ptr, prop);
 
 		/* second slower test, saved people finding keyframe items in menus when its not possible */
 		if (is_anim)
@@ -5238,6 +5251,10 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 		else {
 			uiItemBooleanO(layout, CTX_IFACE_(BLF_I18NCONTEXT_OPERATOR_DEFAULT, "Reset to Default Value"),
 			        ICON_NONE, "UI_OT_reset_default_button", "all", 1);
+		}
+		if (is_editable /*&& is_idprop*/ && is_set) {
+			uiItemO(layout, CTX_IFACE_(BLF_I18NCONTEXT_OPERATOR_DEFAULT, "Unset"),
+			        ICON_NONE, "UI_OT_unset_property_button");
 		}
 		
 		uiItemO(layout, CTX_IFACE_(BLF_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Data Path"),
@@ -7719,6 +7736,8 @@ static int ui_handler_popup(bContext *C, const wmEvent *event, void *userdata)
 		}
 		else if (temp.cancel_func)
 			temp.cancel_func(C, temp.popup_arg);
+
+		WM_event_add_mousemove(C);
 	}
 	else {
 		/* re-enable tooltips */

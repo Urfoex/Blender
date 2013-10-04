@@ -1736,7 +1736,7 @@ static void write_grid_paint_mask(WriteData *wd, int count, GridPaintMask *grid_
 		for (i = 0; i < count; ++i) {
 			GridPaintMask *gpm = &grid_paint_mask[i];
 			if (gpm->data) {
-				const int gridsize = ccg_gridsize(gpm->level);
+				const int gridsize = BKE_ccg_gridsize(gpm->level);
 				writedata(wd, DATA,
 				          sizeof(*gpm->data) * gridsize * gridsize,
 				          gpm->data);
@@ -1757,7 +1757,13 @@ static void write_customdata(WriteData *wd, ID *id, int count, CustomData *data,
 	if (data_tmp.external && !wd->current)
 		CustomData_external_write(&data_tmp, id, CD_MASK_MESH, count, 0);
 
+	for (i = 0; i < data_tmp.totlayer; i++)
+		data_tmp.layers[i].flag &= ~CD_FLAG_NOFREE;
+
 	writestruct_at_address(wd, DATA, "CustomDataLayer", data_tmp.maxlayer, data->layers, data_tmp.layers);
+ 
+	for (i = 0; i < data_tmp.totlayer; i++)
+		data_tmp.layers[i].flag |= CD_FLAG_NOFREE;
 
 	for (i = 0; i < data_tmp.totlayer; i++) {
 		CustomDataLayer *layer= &data_tmp.layers[i];
@@ -2443,7 +2449,8 @@ static void write_soops(WriteData *wd, SpaceOops *so, LinkNode **tmp_mem_list)
 
 		/* restore old treestore */
 		so->treestore = ts;
-	} else {
+	}
+	else {
 		writestruct(wd, DATA, "SpaceOops", 1, so);
 	}
 }

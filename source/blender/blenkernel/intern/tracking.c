@@ -3282,7 +3282,8 @@ BLI_INLINE void mat3f_from_mat3d(float mat_float[3][3], double mat_double[3][3])
 }
 
 /* NOTE: frame number should be in clip space, not scene space */
-static void track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_track, int start_frame, int direction)
+static void track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_track, int start_frame,
+                                             int direction, bool retrack)
 {
 	MovieTrackingPlaneMarker *start_plane_marker = BKE_tracking_plane_marker_get(plane_track, start_frame);
 	MovieTrackingPlaneMarker *keyframe_plane_marker = NULL;
@@ -3339,7 +3340,7 @@ static void track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_trac
 			break;
 		}
 
-		libmv_homography2DFromCorrespondencesLinear(x1, x2, num_correspondences, H_double, 1e-8);
+		libmv_homography2DFromCorrespondencesEuc(x1, x2, num_correspondences, H_double);
 
 		mat3f_from_mat3d(H, H_double);
 
@@ -3359,7 +3360,7 @@ static void track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_trac
 
 		new_plane_marker.framenr = current_frame + frame_delta;
 
-		if (keyframe_plane_marker &&
+		if (!retrack && keyframe_plane_marker &&
 		    next_plane_marker &&
 		    (plane_track->flag & PLANE_TRACK_AUTOKEY))
 		{
@@ -3384,8 +3385,47 @@ static void track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_trac
 /* NOTE: frame number should be in clip space, not scene space */
 void BKE_tracking_track_plane_from_existing_motion(MovieTrackingPlaneTrack *plane_track, int start_frame)
 {
-	track_plane_from_existing_motion(plane_track, start_frame, 1);
-	track_plane_from_existing_motion(plane_track, start_frame, -1);
+	track_plane_from_existing_motion(plane_track, start_frame, 1, false);
+	track_plane_from_existing_motion(plane_track, start_frame, -1, false);
+}
+
+static MovieTrackingPlaneMarker *find_plane_keyframe(MovieTrackingPlaneTrack *plane_track,
+                                                     int start_frame, int direction)
+{
+	MovieTrackingPlaneMarker *plane_marker = BKE_tracking_plane_marker_get(plane_track, start_frame);
+	int index = plane_marker - plane_track->markers;
+	int frame_delta = direction > 0 ? 1 : -1;
+
+	while (index >= 0 && index < plane_track->markersnr) {
+		if ((plane_marker->flag & PLANE_MARKER_TRACKED) == 0) {
+			return plane_marker;
+		}
+		plane_marker += frame_delta;
+	}
+
+	return NULL;
+}
+
+void BKE_tracking_retrack_plane_from_existing_motion_at_segment(MovieTrackingPlaneTrack *plane_track, int start_frame)
+{
+	MovieTrackingPlaneMarker *prev_plane_keyframe, *next_plane_keyframe;
+
+	prev_plane_keyframe = find_plane_keyframe(plane_track, start_frame, -1);
+	next_plane_keyframe = find_plane_keyframe(plane_track, start_frame, 1);
+
+	if (prev_plane_keyframe != NULL && next_plane_keyframe != NULL) {
+		/* First we track from left keyframe to the right one without any blending. */
+		track_plane_from_existing_motion(plane_track, prev_plane_keyframe->framenr, 1, true);
+
+		/* And then we track from the right keyframe to the left one, so shape blends in nicely */
+		track_plane_from_existing_motion(plane_track, next_plane_keyframe->framenr, -1, false);
+	}
+	else if (prev_plane_keyframe != NULL) {
+		track_plane_from_existing_motion(plane_track, prev_plane_keyframe->framenr, 1, true);
+	}
+	else if (next_plane_keyframe != NULL) {
+		track_plane_from_existing_motion(plane_track, next_plane_keyframe->framenr, -1, true);
+	}
 }
 
 BLI_INLINE void float_corners_to_double(/*const*/ float corners[4][2], double double_corners[4][2])
@@ -3404,7 +3444,7 @@ void BKE_tracking_homography_between_two_quads(/*const*/ float reference_corners
 	float_corners_to_double(reference_corners, x1);
 	float_corners_to_double(corners, x2);
 
-	libmv_homography2DFromCorrespondencesLinear(x1, x2, 4, H_double, 1e-8);
+	libmv_homography2DFromCorrespondencesEuc(x1, x2, 4, H_double);
 
 	mat3f_from_mat3d(H, H_double);
 }

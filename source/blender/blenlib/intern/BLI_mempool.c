@@ -45,6 +45,9 @@
 
 #include "BLI_strict_flags.h"  /* keep last */
 
+#ifdef WITH_MEM_VALGRIND
+#  include "valgrind/memcheck.h"
+#endif
 
 /* note: copied from BLO_blend_defs.h, don't use here because we're in BLI */
 #ifdef __BIG_ENDIAN__
@@ -62,6 +65,10 @@
 
 /* when undefined, merge the allocs for BLI_mempool_chunk and its data */
 // #define USE_DATA_PTR
+
+#ifdef DEBUG
+static bool mempool_debug_memset = false;
+#endif
 
 /**
  * A free element from #BLI_mempool_chunk. Data is cast to this type and stored in
@@ -275,6 +282,10 @@ BLI_mempool *BLI_mempool_create(unsigned int esize, unsigned int totelem,
 		lasttail = mempool_chunk_add(pool, mpchunk, lasttail);
 	}
 
+#ifdef WITH_MEM_VALGRIND
+	VALGRIND_CREATE_MEMPOOL(pool, 0, false);
+#endif
+
 	return pool;
 }
 
@@ -297,6 +308,11 @@ void *BLI_mempool_alloc(BLI_mempool *pool)
 	}
 
 	pool->free = pool->free->next;
+
+#ifdef WITH_MEM_VALGRIND
+	VALGRIND_MEMPOOL_ALLOC(pool, retval, pool->esize);
+#endif
+
 	return retval;
 }
 
@@ -329,6 +345,11 @@ void BLI_mempool_free(BLI_mempool *pool, void *addr)
 		if (!found) {
 			BLI_assert(!"Attempt to free data which is not in pool.\n");
 		}
+	}
+
+	/* enable for debugging */
+	if (UNLIKELY(mempool_debug_memset)) {
+		memset(addr, 255, pool->esize);
 	}
 #endif
 
@@ -367,6 +388,10 @@ void BLI_mempool_free(BLI_mempool *pool, void *addr)
 		}
 		curnode->next = NULL; /* terminate the list */
 	}
+
+#ifdef WITH_MEM_VALGRIND
+	VALGRIND_MEMPOOL_FREE(pool, addr);
+#endif
 }
 
 int BLI_mempool_count(BLI_mempool *pool)
@@ -582,6 +607,10 @@ void BLI_mempool_destroy(BLI_mempool *pool)
 {
 	mempool_chunk_free_all(&pool->chunks, pool->flag);
 
+#ifdef WITH_MEM_VALGRIND
+	VALGRIND_DESTROY_MEMPOOL(pool);
+#endif
+
 	if (pool->flag & BLI_MEMPOOL_SYSMALLOC) {
 		free(pool);
 	}
@@ -589,3 +618,10 @@ void BLI_mempool_destroy(BLI_mempool *pool)
 		MEM_freeN(pool);
 	}
 }
+
+#ifdef DEBUG
+void BLI_mempool_set_memory_debug(void)
+{
+	mempool_debug_memset = true;
+}
+#endif
