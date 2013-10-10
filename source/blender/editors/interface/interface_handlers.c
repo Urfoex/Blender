@@ -2658,13 +2658,8 @@ static int ui_do_but_SEARCH_UNLINK(bContext *C, uiBlock *block, uiBut *but, uiHa
 		BLI_rcti_rctf_copy(&rect, &but->rect);
 		
 		rect.xmin = rect.xmax - (BLI_rcti_size_y(&rect));
-		if ( BLI_rcti_isect_pt(&rect, x, y) ) {
-			/* most likely NULL, but let's check, and give it temp zero string */
-			if (data->str == NULL)
-				data->str = MEM_callocN(16, "temp str");
-			data->str[0] = 0;
-			
-			ui_apply_but_TEX(C, but, data);
+		if (BLI_rcti_isect_pt(&rect, x, y)) {
+			ui_set_but_string(C, but, "");
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
 			
 			return WM_UI_HANDLER_BREAK;
@@ -3590,31 +3585,6 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, co
 				return WM_UI_HANDLER_BREAK;
 			}
 		}
-		else if (but->type == COLOR) {
-			if (ELEM3(event->type, MOUSEPAN, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->alt) {
-				float *hsv = ui_block_hsv_get(but->block);
-				float col[3];
-				
-				ui_get_but_vectorf(but, col);
-				rgb_to_hsv_compat_v(col, hsv);
-
-				if (event->type == WHEELDOWNMOUSE)
-					hsv[2] = CLAMPIS(hsv[2] - 0.05f, 0.0f, 1.0f);
-				else if (event->type == WHEELUPMOUSE)
-					hsv[2] = CLAMPIS(hsv[2] + 0.05f, 0.0f, 1.0f);
-				else {
-					float fac = 0.005 * (event->y - event->prevy);
-					hsv[2] = CLAMPIS(hsv[2] + fac, 0.0f, 1.0f);
-				}
-				
-				hsv_to_rgb_v(hsv, data->vec);
-				ui_set_but_vectorf(but, data->vec);
-				
-				button_activate_state(C, but, BUTTON_STATE_EXIT);
-				ui_apply_button(C, but->block, but, data, true);
-				return WM_UI_HANDLER_BREAK;
-			}
-		}
 	}
 	else if (data->state == BUTTON_STATE_WAIT_DRAG) {
 		
@@ -3700,6 +3670,41 @@ static bool ui_numedit_but_NORMAL(uiBut *but, uiHandleButtonData *data, int mx, 
 	data->draglasty = my;
 
 	return changed;
+}
+
+static int ui_do_but_COLOR(bContext *C, uiBut *but, uiHandleButtonData *data, const wmEvent *event)
+{
+	if (data->state == BUTTON_STATE_HIGHLIGHT) {
+		if (ELEM3(event->type, LEFTMOUSE, PADENTER, RETKEY) && event->val == KM_PRESS) {
+			button_activate_state(C, but, BUTTON_STATE_MENU_OPEN);
+			return WM_UI_HANDLER_BREAK;
+		}
+		else if (ELEM3(event->type, MOUSEPAN, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->alt) {
+			float *hsv = ui_block_hsv_get(but->block);
+			float col[3];
+
+			ui_get_but_vectorf(but, col);
+			rgb_to_hsv_compat_v(col, hsv);
+
+			if (event->type == WHEELDOWNMOUSE)
+				hsv[2] = CLAMPIS(hsv[2] - 0.05f, 0.0f, 1.0f);
+			else if (event->type == WHEELUPMOUSE)
+				hsv[2] = CLAMPIS(hsv[2] + 0.05f, 0.0f, 1.0f);
+			else {
+				float fac = 0.005 * (event->y - event->prevy);
+				hsv[2] = CLAMPIS(hsv[2] + fac, 0.0f, 1.0f);
+			}
+
+			hsv_to_rgb_v(hsv, data->vec);
+			ui_set_but_vectorf(but, data->vec);
+
+			button_activate_state(C, but, BUTTON_STATE_EXIT);
+			ui_apply_button(C, but->block, but, data, true);
+			return WM_UI_HANDLER_BREAK;
+		}
+	}
+
+	return WM_UI_HANDLER_CONTINUE;
 }
 
 static int ui_do_but_NORMAL(bContext *C, uiBlock *block, uiBut *but, uiHandleButtonData *data, const wmEvent *event)
@@ -5400,6 +5405,28 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 		else if (event->type == EVT_DROP) {
 			ui_but_drop(C, event, but, data);
 		}
+		/* handle eyedropper */
+		else if ((event->type == EKEY) && (event->val == KM_PRESS)) {
+			if (event->alt || event->shift || event->ctrl || event->oskey) {
+				/* pass */
+			}
+			else {
+				if (but->type == COLOR) {
+					WM_operator_name_call(C, "UI_OT_eyedropper_color", WM_OP_INVOKE_DEFAULT, NULL);
+					return WM_UI_HANDLER_BREAK;
+				}
+				else if (but->type == SEARCH_MENU_UNLINK) {
+					if (but->rnaprop && RNA_property_type(but->rnaprop) == PROP_POINTER) {
+						StructRNA *type = RNA_property_pointer_type(&but->rnapoin, but->rnaprop);
+						const short idcode = RNA_type_to_ID_code(type);
+						if ((idcode == ID_OB) || OB_DATA_SUPPORT_ID(idcode)) {
+							WM_operator_name_call(C, "UI_OT_eyedropper_id", WM_OP_INVOKE_DEFAULT, NULL);
+							return WM_UI_HANDLER_BREAK;
+						}
+					}
+				}
+			}
+		}
 		/* handle keyframing */
 		else if ((event->type == IKEY) &&
 		         !ELEM(KM_MOD_FIRST, event->ctrl, event->oskey) &&
@@ -5545,7 +5572,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 			if (but->a1 == UI_GRAD_V_ALT)  /* signal to prevent calling up color picker */
 				retval = ui_do_but_EXIT(C, but, data, event);
 			else
-				retval = ui_do_but_BLOCK(C, but, data, event);
+				retval = ui_do_but_COLOR(C, but, data, event);
 			break;
 		case BUT_NORMAL:
 			retval = ui_do_but_NORMAL(C, block, but, data, event);

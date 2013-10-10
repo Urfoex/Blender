@@ -9707,11 +9707,27 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
+	
+	if (!MAIN_VERSION_ATLEAST(main, 269, 1)) {
+		/* Removal of Cycles SSS Compatible falloff */
+		FOREACH_NODETREE(main, ntree, id) {
+			if (ntree->type == NTREE_SHADER) {
+				bNode *node;
+				for (node = ntree->nodes.first; node; node = node->next) {
+					if (node->type == SH_NODE_SUBSURFACE_SCATTERING) {
+						if (node->custom1 == SHD_SUBSURFACE_COMPATIBLE) {
+							node->custom1 = SHD_SUBSURFACE_CUBIC;
+						}
+					}
+				}
+			}
+		} FOREACH_NODETREE_END
+	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init see do_versions_userdef() above! */
 
-	/* don't forget to set version number in blender.c! */
+	/* don't forget to set version number in BKE_blender.h! */
 }
 
 #if 0 // XXX: disabled for now... we still don't have this in the right place in the loading code for it to work

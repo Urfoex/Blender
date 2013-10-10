@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+#
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -14,57 +16,32 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# The Original Code is Copyright (C) 2012, Blender Foundation
+# The Original Code is Copyright (C) 2013, Blender Foundation
 # All rights reserved.
 #
 # The Original Code is: all of this file.
 #
-# Contributor(s): Sergey Sharybin.
+# Contributor(s):
 #
 # ***** END GPL LICENSE BLOCK *****
 
-set(INC
-	.
-	../guardedalloc
-	../../source/blender/blenlib
-)
+Import ('env')
 
-set(INC_SYS
+source_files = ['openimageio_api.cpp']
 
-)
+incs = ['.',
+    '../../../blenkernel',
+    '../../',
+    '..',
+    '../../../blenlib',
+    'intern/include',
+    '#/intern/guardedalloc',
+    '../../../makesdna',
+    '#/intern/utfconv']
 
-set(SRC
-	ocio_capi.cc
-	fallback_impl.cc
+defs = ['WITH_PSD']
 
-	ocio_capi.h
-	ocio_impl.h
-)
+if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc'):
+    incs.append(env['BF_PTHREADS_INC'])
 
-if(WITH_OPENCOLORIO)
-	add_definitions(
-		-DWITH_OCIO
-		-DGLEW_STATIC
-	)
-
-	list(APPEND INC_SYS
-		${OPENCOLORIO_INCLUDE_DIRS}
-		${GLEW_INCLUDE_PATH}
-	)
-
-	list(APPEND SRC
-		ocio_impl.cc
-		ocio_impl_glsl.cc
-	)
-
-	if(WIN32 AND NOT MINGW)
-		list(APPEND INC_SYS
-			${BOOST_INCLUDE_DIR}
-		)
-	endif()
-
-	data_to_c_simple(gpu_shader_display_transform.glsl SRC)
-endif()
-
-
-blender_add_lib(bf_intern_opencolorio "${SRC}" "${INC}" "${INC_SYS}")
+env.BlenderLib ('bf_imbuf_openimageio', source_files, incs, defs, libtype=['core','player'], priority = [225,180])

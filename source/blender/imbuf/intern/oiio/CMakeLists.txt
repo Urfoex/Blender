@@ -14,19 +14,24 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# The Original Code is Copyright (C) 2012, Blender Foundation
+# The Original Code is Copyright (C) 2013, Blender Foundation
 # All rights reserved.
 #
 # The Original Code is: all of this file.
 #
-# Contributor(s): Sergey Sharybin.
+# Contributor(s):
 #
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
 	.
-	../guardedalloc
-	../../source/blender/blenlib
+	..
+	../..
+	../../../blenkernel
+	../../../blenlib
+	../../../makesdna
+	../../../../../intern/guardedalloc
+	../../../../../intern/utfconv
 )
 
 set(INC_SYS
@@ -34,37 +39,16 @@ set(INC_SYS
 )
 
 set(SRC
-	ocio_capi.cc
-	fallback_impl.cc
+	openimageio_api.h
 
-	ocio_capi.h
-	ocio_impl.h
+	openimageio_api.cpp
 )
 
-if(WITH_OPENCOLORIO)
-	add_definitions(
-		-DWITH_OCIO
-		-DGLEW_STATIC
-	)
-
+if(WITH_IMAGE_PSD)
 	list(APPEND INC_SYS
-		${OPENCOLORIO_INCLUDE_DIRS}
-		${GLEW_INCLUDE_PATH}
+		${OPENIMAGEIO_INCLUDE_DIRS}
 	)
-
-	list(APPEND SRC
-		ocio_impl.cc
-		ocio_impl_glsl.cc
-	)
-
-	if(WIN32 AND NOT MINGW)
-		list(APPEND INC_SYS
-			${BOOST_INCLUDE_DIR}
-		)
-	endif()
-
-	data_to_c_simple(gpu_shader_display_transform.glsl SRC)
+	add_definitions(-DWITH_PSD)
 endif()
 
-
-blender_add_lib(bf_intern_opencolorio "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(bf_imbuf_openimageio "${SRC}" "${INC}" "${INC_SYS}")
